@@ -1,9 +1,13 @@
+using System.Diagnostics;
+using Serilog.Context;
+
 namespace FI.Api.Middleware;
 
 /// <summary>
 /// Bkz. docs/FAILURE_INTELLIGENCE_ARCHITECTURE.md Bölüm 30.
-/// İstemci X-Correlation-Id gönderebilir; göndermezse üretilir. HttpContext.Items ve response
-/// header'ına yazılır. Serilog LogContext entegrasyonu M6'da (Gün 11) eklenecek.
+/// İstemci X-Correlation-Id gönderebilir; göndermezse üretilir. HttpContext.Items, response
+/// header'ı, Serilog LogContext ve aktif OpenTelemetry Activity (fi.correlation_id tag'i) ile
+/// yayılır — alt log/trace kayıtlarında tutarlı şekilde görünür.
 /// </summary>
 public class CorrelationIdMiddleware
 {
@@ -27,7 +31,12 @@ public class CorrelationIdMiddleware
         context.Items[ItemsKey] = correlationId;
         context.Response.Headers[HeaderName] = correlationId.ToString();
 
-        await _next(context);
+        Activity.Current?.SetTag("fi.correlation_id", correlationId.ToString());
+
+        using (LogContext.PushProperty("CorrelationId", correlationId))
+        {
+            await _next(context);
+        }
     }
 }
 

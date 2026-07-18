@@ -7,8 +7,26 @@ using Hangfire;
 using Hangfire.PostgreSql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using Serilog;
+using Serilog.Formatting.Compact;
+
+// Bkz. docs/FAILURE_INTELLIGENCE_ARCHITECTURE.md Bolum 29. JSON structured logging, Program.cs
+// disaridan (Testcontainers/WebApplicationFactory) baglanti dizesi override edilmeden ONCE
+// bootstrap logger olarak calisir; asil logger builder.Host.UseSerilog ile yeniden kurulur.
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .WriteTo.Console(new CompactJsonFormatter())
+    .CreateBootstrapLogger();
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, services, loggerConfig) => loggerConfig
+    .ReadFrom.Configuration(context.Configuration)
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("ServiceName", "fi-api")
+    .WriteTo.Console(new CompactJsonFormatter()));
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -43,6 +61,16 @@ builder.Services.AddHttpClient<IAiAnalysisClient, AnthropicMessagesClient>(clien
     client.Timeout = TimeSpan.FromSeconds(30);
 });
 
+// Bkz. Bolum 30 - span hiyerarsisi: IngestEvent/ClassifyEvent/CollectEvidence/AIAnalysis zinciri
+// ayni fi.correlation_id ile iliskilendirilir (CorrelationIdMiddleware, Activity'ye tag ekler).
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService(serviceName: "fi-api", serviceVersion: "1.0.0"))
+    .WithTracing(tracing => tracing
+        .AddSource("FI.Api")
+        .AddAspNetCoreInstrumentation(o => o.Filter = ctx => ctx.Request.Path != "/health/live" && ctx.Request.Path != "/health/ready")
+        .AddHttpClientInstrumentation()
+        .AddConsoleExporter());
+
 var app = builder.Build();
 
 // Container başlangıcında migration'ı otomatik uygula (bkz. docs/FAILURE_INTELLIGENCE_ARCHITECTURE.md Bölüm 50, madde 7).
@@ -64,6 +92,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseSerilogRequestLogging();
 
 app.UseHttpsRedirection();
 

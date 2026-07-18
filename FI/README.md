@@ -73,21 +73,35 @@ doküman Bölüm 50).
 - `GET /api/v1/incidents/{id}` yanıtına `latestAnalysis` eklendi.
 - Testlerde gerçek API çağrısı yerine `FakeAiAnalysisClient` (test double) kullanılıyor.
 
-**Henüz YOK (M6+):** `CONFIG_CHANGE` evidence kaynağı (audit log altyapısı gerektiriyor),
-PII/secret redaction pipeline'ı (event/response şu an ham JSON olarak saklanıyor — Bölüm 33.3),
-gerçek şema validasyonu/timeout/network hatası tespiti (connector'larla gelecek),
-parse-fail durumunda 1 kez retry (Bölüm 26.2 — şu an doğrudan NEEDS_HUMAN_REVIEW), golden
-dataset/eval harness (Bölüm 26.4), Serilog/OpenTelemetry (Bölüm 50 M6).
+**M6 — Observability (Serilog + OpenTelemetry) tamamlandı.** Eklenenler:
+- Serilog JSON structured logging (`CompactJsonFormatter`, konsola), `Enrich.FromLogContext()`.
+- `CorrelationIdMiddleware` artık `Serilog.Context.LogContext.PushProperty("CorrelationId", ...)`
+  ile alt loglara correlation id'yi yayıyor, ayrıca aktif OpenTelemetry `Activity`'ye
+  `fi.correlation_id` tag'i ekliyor (Bölüm 30'daki span-attribute kuralına uygun).
+- OpenTelemetry tracing: ASP.NET Core + HttpClient instrumentation (Anthropic çağrıları dahil),
+  konsol exporter. `Npgsql` instrumentation, EF Core'un kullandığı Npgsql sürümüyle (8.0.x)
+  `Npgsql.OpenTelemetry` paketinin çektiği sürüm (10.0.x) arasındaki potansiyel çakışma riski
+  nedeniyle bilinçli olarak **dışarıda bırakıldı** — ASP.NET Core+HttpClient span'ları zaten
+  ingestion→AI-çağrısı zincirinin kritik kısmını kapsıyor.
+- `app.UseSerilogRequestLogging()` — her HTTP isteği için yapılandırılmış özet log satırı.
+
+**Henüz YOK:** `CONFIG_CHANGE` evidence kaynağı (audit log altyapısı gerektiriyor), PII/secret
+redaction pipeline'ı (event/response şu an ham JSON olarak saklanıyor — Bölüm 33.3), gerçek
+şema validasyonu/timeout/network hatası tespiti (connector'larla gelecek), parse-fail
+durumunda 1 kez retry (Bölüm 26.2 — şu an doğrudan NEEDS_HUMAN_REVIEW), golden dataset/eval
+harness (Bölüm 26.4), Npgsql-özel trace span'ları, gerçek Mock Stripe/GitHub/SES connector'ları
+(Bölüm 34-37 — genel ingestion API zaten bunları kabul edebiliyor, özel connector kodu yok),
+Seq/OTLP collector entegrasyonu (şu an yalnızca konsol exporter).
 
 **Doğrulama durumu:** Build 0 hata/0 uyarı. 79/79 domain unit testi (AI validator'ın parse/
 echo/confidence/grounding senaryoları dahil) geçti. Entegrasyon testleri her sınıf **izole**
-çalıştırıldığında güvenilir şekilde geçiyor (M1 3/3, M2 13/13, M3 18/18, M4 22/22, M5 5/5) —
-bu oturumda altı Testcontainers-ağırlıklı sınıfın *aynı process'te art arda* çalıştırılması
-zaman zaman yerel Docker Desktop'ta bağlantı kararsızlığına yol açtı (kod hatası değil, ortam
-sınırlaması; ADR olarak not edildi). **Canlı doğrulama (gerçek Anthropic API key ile):** tam
-pipeline (ingest → classify → fingerprint → incident → evidence → gerçek Claude Haiku analizi)
-uçtan uca çalıştı — model, tek kaynaklı evidence'a dayanarak grounded bir kök neden ürettü ve
-kendi belirsizliğini fark edip `needsHumanReview=true` işaretledi.
+çalıştırıldığında güvenilir şekilde geçiyor (M1 3/3, M2 13/13, M3 18/18, M4 22/22, M5 5/5, M6
+app-boot doğrulaması 3/3) — bu oturumda altı Testcontainers-ağırlıklı sınıfın *aynı process'te
+art arda* çalıştırılması zaman zaman yerel Docker Desktop'ta bağlantı kararsızlığına yol açtı
+(kod hatası değil, ortam sınırlaması). **Canlı doğrulama (gerçek Anthropic API key ile, M5'te):**
+tam pipeline (ingest → classify → fingerprint → incident → evidence → gerçek Claude Haiku
+analizi) uçtan uca çalıştı — model, tek kaynaklı evidence'a dayanarak grounded bir kök neden
+üretti ve kendi belirsizliğini fark edip `needsHumanReview=true` işaretledi.
 
 ## Quick Start
 
@@ -152,12 +166,18 @@ FI/
 Bağımlılık kuralı: `Domain` hiçbir şeye bağımlı değildir; `Application` yalnızca kendi
 arayüzlerine bağımlıdır; `Infrastructure` bu arayüzleri implemente eder; `Api` composition root'tur.
 
-## Sonraki Milestone
+## Sonraki Adımlar (Post-M6)
 
-M6 — Serilog + Seq structured logging, OpenTelemetry (trace/span zinciri), health check
-genişletmesi, Mock Stripe/GitHub/SES-SendGrid connector'ları, demo senaryosu, golden dataset
-(20 senaryo) + eval harness. Bkz. mimari doküman Bölüm 29-32 (Logging/Tracing/Metrics/Health),
-Bölüm 34-37 (Connector Architecture), Bölüm 26.4 (Golden Dataset), Bölüm 42 (14 Günlük Plan).
+14 günlük planın çekirdek zinciri (event → classify → fingerprint → incident → evidence →
+AI analiz → observability) artık uçtan uca çalışıyor. Kalan, kasıtlı olarak ertelenmiş işler:
+- Mock Stripe/GitHub/SES-SendGrid connector'ları + demo senaryosu (Bölüm 34-37, 42)
+- Golden dataset (20 senaryo) + eval harness (Bölüm 26.4)
+- PII/secret redaction pipeline'ı (Bölüm 33.3)
+- `CONFIG_CHANGE` evidence kaynağı (audit log altyapısı)
+- Seq/OTLP collector entegrasyonu (şu an yalnızca konsol exporter)
+
+Bkz. `docs/FAILURE_INTELLIGENCE_ARCHITECTURE.md` Bölüm 43 (Post-MVP Roadmap) ve Bölüm 49
+(Open Decisions).
 
 ## AI Provider Yapılandırması (Anthropic)
 

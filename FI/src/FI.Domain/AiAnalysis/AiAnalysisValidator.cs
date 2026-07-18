@@ -17,6 +17,7 @@ public static class AiAnalysisValidator
 
     private static readonly Regex NumberTokenRegex = new(@"\b\d{2,}\b", RegexOptions.Compiled);
     private static readonly Regex EntityLikeTokenRegex = new(@"\b[A-Z][a-zA-Z0-9_]{3,}\b", RegexOptions.Compiled);
+    private static readonly Regex MarkdownFenceRegex = new(@"^```(?:json)?\s*|\s*```$", RegexOptions.Compiled | RegexOptions.Multiline);
 
     public static (AiAnalysisValidationResult Result, AiAnalysisOutput? Output) Validate(
         string? rawResponseText,
@@ -26,10 +27,16 @@ public static class AiAnalysisValidator
         if (string.IsNullOrWhiteSpace(rawResponseText))
             return (Rejected(AiAnalysisRejectionReason.ParseFailed), null);
 
+        // Modeller "Output ONLY valid JSON" talimatina ragmen siklikla yaniti markdown code
+        // fence icine sarar (orn. Claude). Bir round-trip retry harcamadan bu en yaygin
+        // gercek-dunya durumunu temizleyerek cozuyoruz (Bolum 26.2'deki retry, bundan sonraki
+        // gercek parse hatalari icin ayrica degerlendirilebilir).
+        var cleaned = MarkdownFenceRegex.Replace(rawResponseText.Trim(), string.Empty).Trim();
+
         AiAnalysisOutput? output;
         try
         {
-            output = JsonSerializer.Deserialize<AiAnalysisOutput>(rawResponseText, new JsonSerializerOptions
+            output = JsonSerializer.Deserialize<AiAnalysisOutput>(cleaned, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             });

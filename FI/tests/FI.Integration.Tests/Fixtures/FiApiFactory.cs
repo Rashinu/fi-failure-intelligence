@@ -1,3 +1,4 @@
+using FI.Domain.AiAnalysis;
 using FI.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -12,9 +13,12 @@ namespace FI.Integration.Tests.Fixtures;
 /// <summary>
 /// Gerçek bir PostgreSQL container'ı ayağa kaldırıp FI.Api'yi buna karşı test eder.
 /// Bkz. docs/FAILURE_INTELLIGENCE_ARCHITECTURE.md ADR-006 (Testcontainers stratejisi).
+/// Gerçek Anthropic API çağrısı yerine FakeAiAnalysisClient kullanılır (Bölüm 38.1).
 /// </summary>
 public class FiApiFactory : WebApplicationFactory<FI.Api.Program>, IAsyncLifetime
 {
+    public FakeAiAnalysisClient FakeAiClient { get; } = new();
+
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")
         .WithDatabase("fi_test")
@@ -33,6 +37,13 @@ public class FiApiFactory : WebApplicationFactory<FI.Api.Program>, IAsyncLifetim
             {
                 ["ConnectionStrings:FiDatabase"] = _postgres.GetConnectionString()
             });
+        });
+
+        builder.ConfigureServices(services =>
+        {
+            var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IAiAnalysisClient));
+            if (descriptor is not null) services.Remove(descriptor);
+            services.AddSingleton<IAiAnalysisClient>(FakeAiClient);
         });
     }
 

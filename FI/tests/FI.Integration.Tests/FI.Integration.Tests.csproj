@@ -23,6 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\FI.Api\FI.Api.csproj" />
     <ProjectReference Include="..\..\src\FI.Infrastructure\FI.Infrastructure.csproj" />
   </ItemGroup>

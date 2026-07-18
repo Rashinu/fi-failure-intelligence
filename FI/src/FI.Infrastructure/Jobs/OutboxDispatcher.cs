@@ -59,6 +59,14 @@ public class OutboxDispatcher
                         _backgroundJobClient.Enqueue<EvidenceCollectorJobHandler>(h => h.ExecuteAsync(incidentId, correlationId, CancellationToken.None));
                         break;
                     }
+                    case OutboxMessageType.AiAnalysisJob:
+                    {
+                        var payload = JsonDocument.Parse(message.Payload).RootElement;
+                        var incidentId = payload.GetProperty("incidentId").GetGuid();
+                        var correlationId = payload.GetProperty("correlationId").GetGuid();
+                        _backgroundJobClient.Enqueue<AiAnalysisJobHandler>(h => h.ExecuteAsync(incidentId, correlationId, CancellationToken.None));
+                        break;
+                    }
                     default:
                         _logger.LogWarning("OutboxDispatcher: {MessageType} için henüz bir tüketici yok, atlanıyor.", message.MessageType);
                         break;

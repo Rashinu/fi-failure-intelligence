@@ -24,6 +24,17 @@ public sealed record IncidentEvidenceResponse(
     DateTimeOffset? WindowEnd,
     DateTimeOffset CollectedAt);
 
+public sealed record AiAnalysisResponse(
+    Guid Id,
+    string IncidentTitle,
+    string ProbableRootCause,
+    IReadOnlyList<string> Evidence,
+    IReadOnlyList<string> RecommendedActions,
+    double Confidence,
+    bool NeedsHumanReview,
+    string ModelVersion,
+    DateTimeOffset CreatedAt);
+
 public sealed record IncidentDetailResponse(
     Guid Id,
     Guid IntegrationId,
@@ -36,4 +47,5 @@ public sealed record IncidentDetailResponse(
     int EventCount,
     int ReopenCount,
     string Fingerprint,
-    IReadOnlyList<IncidentEvidenceResponse> Evidence);
+    IReadOnlyList<IncidentEvidenceResponse> Evidence,
+    AiAnalysisResponse? LatestAnalysis);

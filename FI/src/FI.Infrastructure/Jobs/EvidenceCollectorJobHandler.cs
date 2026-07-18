@@ -61,6 +61,10 @@ public class EvidenceCollectorJobHandler
 
         incident.StartInvestigating();
 
+        _db.OutboxMessages.Add(FI.Domain.Outbox.OutboxMessage.Create(
+            FI.Domain.Outbox.OutboxMessageType.AiAnalysisJob,
+            JsonSerializer.Serialize(new { incidentId, correlationId })));
+
         await _db.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(

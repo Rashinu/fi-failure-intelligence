@@ -55,17 +55,39 @@ doküman Bölüm 50).
   her aşama 5sn'lik dispatcher döngüsünden geçtiği için toplam gecikme ~10-15sn olabilir).
 - `GET /api/v1/incidents/{id}` yanıtına `evidence` listesi eklendi.
 
-**Henüz YOK (M5+):** AI analiz pipeline'ı (evidence-only prompt, structured output, confidence,
-grounding validasyonu), `CONFIG_CHANGE` evidence kaynağı (audit log altyapısı gerektiriyor),
+**M5 — AI Analysis Pipeline tamamlandı.** Eklenenler:
+- `IAiAnalysisClient` + `AnthropicMessagesClient` — Semantic Kernel'in stabil bir Anthropic
+  konnektörü olmadığı için doğrudan Anthropic Messages API'sine HTTP ile bağlanan, tek adaptör
+  arkasında provider-agnostic bir istemci (bkz. ADR-013, kod içi not).
+- `AiAnalysisValidator` — Bölüm 26.2'deki zincir: parse → şema/echo → confidence eşiği →
+  grounding (evidence-dışı iddia) kontrolü. Yalnızca **parse hatası** ve **şema/echo
+  uyumsuzluğu** analiz kaydını tamamen reddeder; düşük confidence ve grounding sorunları kaydı
+  oluşturur ama `needsHumanReview`'ı zorlar (dokümanın "zorla true" ifadesiyle birebir).
+  Modellerin (özellikle Claude) "yalnızca JSON döndür" talimatına rağmen çoğunlukla yanıtı
+  ` ```json ` code fence'ine sarması, parse öncesi otomatik temizlenerek ele alınıyor.
+- `AiAnalysisJobHandler` — evidence boşsa AI çağrısı hiç yapılmaz; severity=Critical'da
+  Sonnet'e, aksi halde Haiku'ya yönlendirir; her çağrı (başarısız dahil) `AiAnalysisLog`'a,
+  yalnızca geçerli çıktı `AiIncidentAnalysis`'e (business-facing, versiyonlu) yazılır.
+- `PromptVersion` — startup'ta tek bir ACTIVE prompt (`fi-root-cause-v1`) seed edilir.
+- Üçüncü outbox aşaması: Evidence → `AiAnalysisJob`.
+- `GET /api/v1/incidents/{id}` yanıtına `latestAnalysis` eklendi.
+- Testlerde gerçek API çağrısı yerine `FakeAiAnalysisClient` (test double) kullanılıyor.
+
+**Henüz YOK (M6+):** `CONFIG_CHANGE` evidence kaynağı (audit log altyapısı gerektiriyor),
 PII/secret redaction pipeline'ı (event/response şu an ham JSON olarak saklanıyor — Bölüm 33.3),
 gerçek şema validasyonu/timeout/network hatası tespiti (connector'larla gelecek),
-Serilog/OpenTelemetry (Bölüm 50 M6).
+parse-fail durumunda 1 kez retry (Bölüm 26.2 — şu an doğrudan NEEDS_HUMAN_REVIEW), golden
+dataset/eval harness (Bölüm 26.4), Serilog/OpenTelemetry (Bölüm 50 M6).
 
-**Doğrulama durumu:** Build 0 hata/0 uyarı. 69/69 domain unit testi ve 22/22 Testcontainers
-entegrasyon testi geçti. Canlı `docker compose` duman testi tamamlandı: gerçek Hangfire
-recurring job (iki aşamalı outbox zinciri) bir deployment'ı doğru şekilde evidence olarak
-topladı ve incident'ı `Investigating` durumuna geçirdi (uçtan uca, test içinde handler'ı
-doğrudan çağırmadan).
+**Doğrulama durumu:** Build 0 hata/0 uyarı. 79/79 domain unit testi (AI validator'ın parse/
+echo/confidence/grounding senaryoları dahil) geçti. Entegrasyon testleri her sınıf **izole**
+çalıştırıldığında güvenilir şekilde geçiyor (M1 3/3, M2 13/13, M3 18/18, M4 22/22, M5 5/5) —
+bu oturumda altı Testcontainers-ağırlıklı sınıfın *aynı process'te art arda* çalıştırılması
+zaman zaman yerel Docker Desktop'ta bağlantı kararsızlığına yol açtı (kod hatası değil, ortam
+sınırlaması; ADR olarak not edildi). **Canlı doğrulama (gerçek Anthropic API key ile):** tam
+pipeline (ingest → classify → fingerprint → incident → evidence → gerçek Claude Haiku analizi)
+uçtan uca çalıştı — model, tek kaynaklı evidence'a dayanarak grounded bir kök neden ürettü ve
+kendi belirsizliğini fark edip `needsHumanReview=true` işaretledi.
 
 ## Quick Start
 
@@ -132,8 +154,22 @@ arayüzlerine bağımlıdır; `Infrastructure` bu arayüzleri implemente eder; `
 
 ## Sonraki Milestone
 
-M5 — AI analiz pipeline'ı: `IAiAnalysisClient` interface (Semantic Kernel üzerinden Claude
-Haiku/Sonnet), evidence-only structured output şeması, prompt versioning, parse/şema-echo/
-confidence/grounding validasyon zinciri, golden dataset. Bkz. mimari doküman Bölüm 24
-(AI Analysis Pipeline), Bölüm 25 (Structured Output Schema), Bölüm 26 (Prompt and Evaluation
-Strategy), Bölüm 42 (14 Günlük Plan).
+M6 — Serilog + Seq structured logging, OpenTelemetry (trace/span zinciri), health check
+genişletmesi, Mock Stripe/GitHub/SES-SendGrid connector'ları, demo senaryosu, golden dataset
+(20 senaryo) + eval harness. Bkz. mimari doküman Bölüm 29-32 (Logging/Tracing/Metrics/Health),
+Bölüm 34-37 (Connector Architecture), Bölüm 26.4 (Golden Dataset), Bölüm 42 (14 Günlük Plan).
+
+## AI Provider Yapılandırması (Anthropic)
+
+Gerçek Claude çağrısı için API key **asla appsettings.json'a veya git'e yazılmamalı**.
+Yerel geliştirmede .NET user-secrets kullanılır:
+
+```bash
+cd FI/src/FI.Api
+dotnet user-secrets init   # zaten yapıldıysa atlanır
+dotnet user-secrets set "Ai:AnthropicApiKey" "sk-ant-..."
+```
+
+Üretimde ortam değişkeni: `Ai__AnthropicApiKey`. Key ayarlı değilse `AiAnalysisJobHandler`
+çağrıyı hiç yapmaz, incident'ı `NEEDS_HUMAN_REVIEW` yapar ve `AiAnalysisLog`'a nedeni yazar —
+sistem key'siz ortamda da (ör. CI, Testcontainers) çökmeden çalışır.

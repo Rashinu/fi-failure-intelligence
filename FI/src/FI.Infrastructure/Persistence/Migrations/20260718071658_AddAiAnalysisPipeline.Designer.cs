@@ -3,6 +3,7 @@ using System;
 using FI.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FI.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(FiDbContext))]
-    partial class FiDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260718071658_AddAiAnalysisPipeline")]
+    partial class AddAiAnalysisPipeline
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

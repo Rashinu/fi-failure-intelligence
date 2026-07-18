@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FI.Application.Incidents;
 using FI.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
@@ -5,10 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FI.Api.Controllers;
 
-/// <summary>
-/// Bkz. docs/FAILURE_INTELLIGENCE_ARCHITECTURE.md Bölüm 18.4/18.5. M3 kapsamında yalnızca
-/// temel liste/detay alanları döner; timeline/evidence/latestAnalysis M4-M5'te eklenecek.
-/// </summary>
+/// <summary>Bkz. docs/FAILURE_INTELLIGENCE_ARCHITECTURE.md Bölüm 18.4/18.5. timeline alanı henüz eklenmedi.</summary>
 [ApiController]
 [Route("api/v1/incidents")]
 public class IncidentsController : ControllerBase
@@ -81,6 +79,21 @@ public class IncidentsController : ControllerBase
             .Select(e => new IncidentEvidenceResponse(e.Id, e.SourceType.ToString(), e.Summary, e.WindowStart, e.WindowEnd, e.CollectedAt))
             .ToListAsync(cancellationToken);
 
+        var latestAnalysisEntity = await _db.AiAnalyses.AsNoTracking()
+            .Where(a => a.IncidentId == id && a.IsLatest)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        AiAnalysisResponse? latestAnalysis = latestAnalysisEntity is null ? null : new AiAnalysisResponse(
+            latestAnalysisEntity.Id,
+            latestAnalysisEntity.IncidentTitle,
+            latestAnalysisEntity.ProbableRootCause,
+            JsonSerializer.Deserialize<List<string>>(latestAnalysisEntity.EvidenceJson) ?? new List<string>(),
+            JsonSerializer.Deserialize<List<string>>(latestAnalysisEntity.RecommendedActionsJson) ?? new List<string>(),
+            latestAnalysisEntity.Confidence,
+            latestAnalysisEntity.NeedsHumanReview,
+            latestAnalysisEntity.ModelVersion,
+            latestAnalysisEntity.CreatedAt);
+
         return Ok(new IncidentDetailResponse(
             incident.Id,
             incident.IntegrationId,
@@ -93,6 +106,7 @@ public class IncidentsController : ControllerBase
             incident.EventCount,
             incident.ReopenCount,
             incident.Fingerprint,
-            evidence));
+            evidence,
+            latestAnalysis));
     }
 }

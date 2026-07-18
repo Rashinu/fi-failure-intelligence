@@ -1,0 +1,5 @@
+.claude/
+FI/**/bin/
+FI/**/obj/
+FI/**/.vs/
+*.user

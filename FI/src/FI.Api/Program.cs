@@ -1,6 +1,8 @@
 using FI.Api.Middleware;
 using FI.Domain.AiAnalysis;
+using FI.Domain.Connectors;
 using FI.Infrastructure.Ai;
+using FI.Infrastructure.Connectors;
 using FI.Infrastructure.Jobs;
 using FI.Infrastructure.Persistence;
 using Hangfire;
@@ -54,6 +56,15 @@ builder.Services.AddScoped<ClassifyJobHandler>();
 builder.Services.AddScoped<OutboxDispatcher>();
 builder.Services.AddScoped<EvidenceCollectorJobHandler>();
 builder.Services.AddScoped<AiAnalysisJobHandler>();
+builder.Services.AddScoped<FI.Infrastructure.Eval.PromptVersionPromotionService>();
+
+// Bkz. Bolum 34 - Mock Stripe/GitHub/SES/SendGrid connector'lari, ProviderKey'e gore dictionary
+// lookup ile IConnectorRegistry uzerinden cozulur.
+builder.Services.AddSingleton<IIntegrationConnector, StripeConnector>();
+builder.Services.AddSingleton<IIntegrationConnector, SesConnector>();
+builder.Services.AddSingleton<IIntegrationConnector, SendGridConnector>();
+builder.Services.AddSingleton<IDeploymentConnector, GitHubDeploymentConnector>();
+builder.Services.AddSingleton<IConnectorRegistry, ConnectorRegistry>();
 
 builder.Services.Configure<AnthropicOptions>(builder.Configuration.GetSection(AnthropicOptions.SectionName));
 builder.Services.AddHttpClient<IAiAnalysisClient, AnthropicMessagesClient>(client =>

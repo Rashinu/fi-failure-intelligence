@@ -17,6 +17,9 @@ public class PromptVersionConfiguration : IEntityTypeConfiguration<PromptVersion
         builder.Property(p => p.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(p => p.RolloutPercentage).HasColumnName("rollout_percentage").IsRequired();
         builder.Property(p => p.CreatedAt).HasColumnName("created_at").IsRequired();
+        builder.Property(p => p.EvalOverallAverage).HasColumnName("eval_overall_average");
+        builder.Property(p => p.EvalPerDimensionJson).HasColumnName("eval_per_dimension").HasColumnType("jsonb");
+        builder.Property(p => p.EvaluatedAt).HasColumnName("evaluated_at");
 
         builder.HasIndex(p => p.VersionLabel).IsUnique();
     }

@@ -30,6 +30,7 @@ public class IntegrationConfiguration : IEntityTypeConfiguration<Integration>
             .IsRequired();
         builder.Property(i => i.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(i => i.UpdatedAt).HasColumnName("updated_at").IsRequired();
+        builder.Property(i => i.WebhookSecret).HasColumnName("webhook_secret").HasMaxLength(200);
 
         builder.HasIndex(i => new { i.Name, i.Environment }).IsUnique();
 

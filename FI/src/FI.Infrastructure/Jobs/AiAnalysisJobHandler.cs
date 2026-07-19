@@ -2,6 +2,7 @@ using System.Text.Json;
 using FI.Domain.AiAnalysis;
 using FI.Domain.Classification;
 using FI.Domain.Incidents;
+using FI.Domain.Redaction;
 using FI.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -79,8 +80,11 @@ public class AiAnalysisJobHandler
             Math.Max(affectedRequests, incident.EventCount), incident.FirstSeen, incident.LastSeen,
             0, incident.Fingerprint);
 
+        // Bkz. Bolum 33.3 - Asama B: AI'a (ucuncu taraf servis) gonderilmeden hemen once, en katı
+        // ikinci bir redaction pass'i zorunludur. Evidence ozetleri zaten deterministik
+        // template'lerden turetiliyor (Bolum 23) ama savunma-derinligi olarak yine de gecirilir.
         var evidenceInputs = evidenceRows
-            .Select(e => new EvidenceInput(e.SourceType.ToString(), e.Summary, e.CollectedAt))
+            .Select(e => new EvidenceInput(e.SourceType.ToString(), PayloadRedactor.RedactText(e.Summary) ?? e.Summary, e.CollectedAt))
             .ToList();
 
         var userPayload = JsonSerializer.Serialize(new

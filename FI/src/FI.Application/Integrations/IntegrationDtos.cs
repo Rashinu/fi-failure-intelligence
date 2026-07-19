@@ -28,4 +28,9 @@ public sealed record IntegrationResponse(
 
 public sealed record CreateIntegrationResponse(
     Guid IntegrationId,
-    string ApiKey);
+    string ApiKey,
+    string WebhookSecret);
+
+public sealed record RotateApiKeyResponse(Guid IntegrationId, string ApiKey);
+
+public sealed record RotateWebhookSecretResponse(Guid IntegrationId, string WebhookSecret);

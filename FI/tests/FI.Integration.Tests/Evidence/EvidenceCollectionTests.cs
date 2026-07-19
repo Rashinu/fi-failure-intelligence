@@ -132,6 +132,28 @@ public class EvidenceCollectionTests : IClassFixture<FiApiFactory>
     }
 
     [Fact]
+    public async Task RecentApiKeyRotation_ProducesConfigChangeEvidence()
+    {
+        var client = _factory.CreateClient();
+        var (integrationId, _) = await CreateIntegrationAsync(client);
+
+        var rotateResponse = await client.PostAsync($"/api/v1/integrations/{integrationId}/api-key/rotate", null);
+        var rotated = await rotateResponse.Content.ReadFromJsonAsync<FI.Application.Integrations.RotateApiKeyResponse>();
+        client.DefaultRequestHeaders.Add("X-Api-Key", rotated!.ApiKey);
+
+        var eventId = await IngestEventAsync(client, integrationId, 401, DateTimeOffset.UtcNow);
+        var incidentId = await ClassifyAndReturnIncidentIdAsync(eventId);
+        await CollectEvidenceAsync(incidentId);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<FiDbContext>();
+        var evidence = await db.IncidentEvidence.Where(e => e.IncidentId == incidentId).ToListAsync();
+
+        evidence.Should().Contain(e => e.SourceType == EvidenceSourceType.ConfigChange
+                                        && e.Summary.Contains("API key rotated"));
+    }
+
+    [Fact]
     public async Task NoDeploymentsOrPreviousEvents_ProducesEmptyEvidenceList_NotFabricated()
     {
         var client = _factory.CreateClient();

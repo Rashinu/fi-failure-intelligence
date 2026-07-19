@@ -1,0 +1,136 @@
+name: FI CI
+
+# Bkz. docs/FAILURE_INTELLIGENCE_ARCHITECTURE.md Bölüm 39. Sıralama en ucuz->en pahalı:
+# Build -> Test (unit önce, sonra Testcontainers-ağırlıklı integration) -> Migration Check ->
+# Docker Build. Başarısız unit test için Docker image build edilmez.
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "FI/**"
+      - ".github/workflows/fi-ci.yml"
+  pull_request:
+    branches: [master, main]
+    paths:
+      - "FI/**"
+      - ".github/workflows/fi-ci.yml"
+  workflow_dispatch: {}
+
+defaults:
+  run:
+    working-directory: FI
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: FI/global.json
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build (Release)
+        run: dotnet build --configuration Release --no-restore
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: FI/global.json
+
+      - name: Restore
+        run: dotnet restore
+
+      # Bkz. Bolum 38.1 - unit testler once (hizli geri bildirim), Testcontainers gerektirmez.
+      - name: Unit tests (FI.Domain.Tests)
+        run: >
+          dotnet test tests/FI.Domain.Tests/FI.Domain.Tests.csproj
+          --configuration Release
+          --collect:"XPlat Code Coverage"
+          --results-directory ./coverage/domain
+
+      # Testcontainers gercek bir PostgreSQL container'i indirir/calistirir - ubuntu-latest'te
+      # Docker onceden kurulu ve calisir durumda oldugundan ek bir docker-in-docker adimi gerekmez.
+      - name: Integration + E2E tests (FI.Integration.Tests, Testcontainers)
+        run: >
+          dotnet test tests/FI.Integration.Tests/FI.Integration.Tests.csproj
+          --configuration Release
+          --collect:"XPlat Code Coverage"
+          --results-directory ./coverage/integration
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: FI/coverage/**/*.xml
+          if-no-files-found: warn
+
+  migration-check:
+    needs: test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: fi_migration_check
+          POSTGRES_USER: fi_app
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fi_app -d fi_migration_check"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: FI/global.json
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Restore local tools (dotnet-ef)
+        run: dotnet tool restore
+
+      # Bkz. Bolum 39 - "gecici PostgreSQL container'i, dotnet ef database update sifirdan,
+      # basarisizsa kirmizi". InitialCreate'ten en son migration'a kadar hicbir manuel adim
+      # olmadan, sifir bir veritabaninda basariyla uygulanabildigini dogrular.
+      - name: Apply all migrations from scratch
+        run: >
+          dotnet ef database update
+          --project src/FI.Infrastructure/FI.Infrastructure.csproj
+          --startup-project src/FI.Api/FI.Api.csproj
+          --connection "Host=localhost;Port=5432;Database=fi_migration_check;Username=fi_app;Password=ci-only-password"
+
+  docker-build:
+    needs: migration-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          time docker build -f docker/Dockerfile -t fi-api:${{ github.sha }} .
+          docker image inspect fi-api:${{ github.sha }} --format='Image size: {{.Size}} bytes'
+
+      # Bkz. Bolum 39 - "main branch'te push". Bu is akisi henuz bir gercek registry
+      # yapilandirmiyor (kapsam disi - bkz. README Sonraki Adimlar); sadece imajin basariyla
+      # build edildigini dogrular ve boyutunu/suresini loglar.
+      - name: Push (main branch only)
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+        run: echo "Push adimi henuz bir container registry'ye baglanmadi - bkz. README Sonraki Adimlar."

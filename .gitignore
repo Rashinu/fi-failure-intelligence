@@ -2,4 +2,5 @@
 FI/**/bin/
 FI/**/obj/
 FI/**/.vs/
+FI/coverage/
 *.user

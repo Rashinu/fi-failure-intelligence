@@ -5,6 +5,7 @@ using FI.Api.Middleware;
 using FI.Application.Ingestion;
 using FI.Domain.Ingestion;
 using FI.Domain.Outbox;
+using FI.Domain.Redaction;
 using FI.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -49,8 +50,10 @@ public class EventsController : ControllerBase
         if (!Enum.TryParse<IntegrationEventType>(request.Type, ignoreCase: true, out var eventType))
             return UnprocessableEntity(new { error = $"Geçersiz type: {request.Type}. Beklenen: ApiCall | WebhookIn | WebhookOut." });
 
-        var requestJson = request.Request is null ? null : JsonSerializer.Serialize(request.Request);
-        var responseJson = request.Response is null ? null : JsonSerializer.Serialize(request.Response);
+        // Bkz. docs/FAILURE_INTELLIGENCE_ARCHITECTURE.md Bölüm 33.3 - Aşama A: ham payload hiçbir
+        // observability sistemine (burada: veritabanına) redaction'sız yazılmaz.
+        var requestJson = RedactToJsonString(request.Request);
+        var responseJson = RedactToJsonString(request.Response);
 
         if (ByteLength(requestJson) > MaxSingleFieldBytes || ByteLength(responseJson) > MaxSingleFieldBytes)
             return StatusCode(StatusCodes.Status413PayloadTooLarge, new { error = $"Tek alan {MaxSingleFieldBytes} byte sınırını aşamaz." });
@@ -128,6 +131,14 @@ public class EventsController : ControllerBase
         if (existing is null) return (false, null);
 
         return existing.RequestHash == requestHash ? (false, existing.ResourceId) : (true, null);
+    }
+
+    private static string? RedactToJsonString(object? value)
+    {
+        if (value is null) return null;
+        var node = JsonSerializer.SerializeToNode(value);
+        var redacted = PayloadRedactor.RedactJson(node);
+        return redacted?.ToJsonString();
     }
 
     private static int ByteLength(string? value) => value is null ? 0 : Encoding.UTF8.GetByteCount(value);

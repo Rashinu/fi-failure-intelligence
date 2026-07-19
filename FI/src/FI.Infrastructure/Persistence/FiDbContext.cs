@@ -1,4 +1,5 @@
 using FI.Domain.AiAnalysis;
+using FI.Domain.Audit;
 using FI.Domain.Incidents;
 using FI.Domain.Ingestion;
 using FI.Domain.Outbox;
@@ -24,6 +25,7 @@ public class FiDbContext : DbContext
     public DbSet<AiIncidentAnalysis> AiAnalyses => Set<AiIncidentAnalysis>();
     public DbSet<AiAnalysisLog> AiAnalysisLogs => Set<AiAnalysisLog>();
     public DbSet<IncidentReview> IncidentReviews => Set<IncidentReview>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

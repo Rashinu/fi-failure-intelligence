@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FI.Domain.Audit;
 using FI.Domain.Incidents;
 using FI.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -7,20 +8,22 @@ using Microsoft.Extensions.Logging;
 namespace FI.Infrastructure.Jobs;
 
 /// <summary>
-/// Bkz. docs/FAILURE_INTELLIGENCE_ARCHITECTURE.md Bolum 23. 4 kaynaktan 3'unu doldurur:
-/// DEPLOYMENT, PREVIOUS_EVENT, HISTORICAL_INCIDENT. CONFIG_CHANGE, config-degisiklik audit
-/// gunlugu (henuz insa edilmedi) kuruluncaya kadar kasitli olarak atlanir - hicbir evidence
-/// yanlislikla uydurulmuyor; sadece gercek veriye sahip oldugumuz kaynaklar doldurulur.
-/// Herhangi bir kaynak bos donerse, o sourceType evidence listesinde yer almaz.
+/// Bkz. docs/FAILURE_INTELLIGENCE_ARCHITECTURE.md Bolum 23. 4 kaynagin tamamini doldurur:
+/// CONFIG_CHANGE, HISTORICAL_INCIDENT, DEPLOYMENT, PREVIOUS_EVENT (bu oncelik sirasiyla).
+/// CONFIG_CHANGE, IntegrationsController'daki rotate/update endpoint'lerinin yazdigi
+/// AuditLog kayitlarindan turetilir (M10). Herhangi bir kaynak bos donerse, o sourceType
+/// evidence listesinde yer almaz - hicbir evidence yanlislikla uydurulmuyor.
 /// </summary>
 public class EvidenceCollectorJobHandler
 {
     private const int MaxEvidenceItems = 10;
     private const int MaxPreviousEvents = 5;
     private const int MaxHistoricalIncidents = 5;
+    private const int MaxConfigChangeItems = 5;
     private static readonly TimeSpan DeploymentWindowBefore = TimeSpan.FromHours(2);
     private static readonly TimeSpan PreviousEventWindow = TimeSpan.FromHours(24);
     private static readonly TimeSpan HistoricalIncidentWindow = TimeSpan.FromDays(90);
+    private static readonly TimeSpan ConfigChangeWindowBefore = TimeSpan.FromHours(6);
 
     private readonly FiDbContext _db;
     private readonly ILogger<EvidenceCollectorJobHandler> _logger;
@@ -47,12 +50,13 @@ public class EvidenceCollectorJobHandler
             return;
         }
 
+        var configChangeEvidence = await CollectConfigChangeEvidenceAsync(incident, integration.Name, cancellationToken);
         var deploymentEvidence = await CollectDeploymentEvidenceAsync(incident, integration.Name, cancellationToken);
         var historicalEvidence = await CollectHistoricalIncidentEvidenceAsync(incident, cancellationToken);
         var previousEventEvidence = await CollectPreviousEventEvidenceAsync(incident, cancellationToken);
 
-        // Onceliklendirme (Bolum 23): CONFIG_CHANGE (yok) > HISTORICAL_INCIDENT > DEPLOYMENT > PREVIOUS_EVENT.
-        var ordered = historicalEvidence.Concat(deploymentEvidence).Concat(previousEventEvidence)
+        // Onceliklendirme (Bolum 23): CONFIG_CHANGE > HISTORICAL_INCIDENT > DEPLOYMENT > PREVIOUS_EVENT.
+        var ordered = configChangeEvidence.Concat(historicalEvidence).Concat(deploymentEvidence).Concat(previousEventEvidence)
             .Take(MaxEvidenceItems)
             .ToList();
 
@@ -71,6 +75,35 @@ public class EvidenceCollectorJobHandler
             "Incident {IncidentId} icin {Count} evidence toplandi, correlation {CorrelationId}",
             incidentId, ordered.Count, correlationId);
     }
+
+    private async Task<List<IncidentEvidence>> CollectConfigChangeEvidenceAsync(Incident incident, string integrationName, CancellationToken cancellationToken)
+    {
+        var windowStart = incident.FirstSeen - ConfigChangeWindowBefore;
+        var windowEnd = incident.FirstSeen;
+
+        var auditLogs = await _db.AuditLogs
+            .Where(a => a.EntityType == AuditEntityTypes.Integration && a.EntityId == incident.IntegrationId
+                        && a.CreatedAt >= windowStart && a.CreatedAt <= windowEnd)
+            .OrderByDescending(a => a.CreatedAt)
+            .Take(MaxConfigChangeItems)
+            .ToListAsync(cancellationToken);
+
+        return auditLogs.Select(a =>
+        {
+            var minutesBefore = (int)(incident.FirstSeen - a.CreatedAt).TotalMinutes;
+            var summary = $"{DescribeAuditAction(a.Action)} for integration '{integrationName}' {minutesBefore} minute(s) before first failure";
+            return IncidentEvidence.Create(
+                incident.Id, EvidenceSourceType.ConfigChange, a.Id, summary, a.Changes, windowStart, windowEnd);
+        }).ToList();
+    }
+
+    private static string DescribeAuditAction(string action) => action switch
+    {
+        AuditActions.ApiKeyRotated => "API key rotated",
+        AuditActions.WebhookSecretRotated => "Webhook secret rotated",
+        AuditActions.IntegrationUpdated => "Integration configuration changed",
+        _ => action
+    };
 
     private async Task<List<IncidentEvidence>> CollectDeploymentEvidenceAsync(Incident incident, string integrationName, CancellationToken cancellationToken)
     {

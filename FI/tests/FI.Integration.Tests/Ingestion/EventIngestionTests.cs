@@ -2,8 +2,11 @@ using System.Net;
 using System.Net.Http.Json;
 using FI.Application.Ingestion;
 using FI.Application.Integrations;
+using FI.Infrastructure.Persistence;
 using FI.Integration.Tests.Fixtures;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace FI.Integration.Tests.Ingestion;
@@ -163,5 +166,41 @@ public class EventIngestionTests : IClassFixture<FiApiFactory>
         var response = await client.PostAsJsonAsync("/api/v1/events", request);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    /// <summary>Bkz. docs/FAILURE_INTELLIGENCE_ARCHITECTURE.md Bölüm 33.3 — Aşama A doğrulaması.</summary>
+    [Fact]
+    public async Task Ingest_WithSensitiveFieldsInPayload_PersistsRedactedNotRaw()
+    {
+        var client = _factory.CreateClient();
+        var (integrationId, apiKey) = await CreateIntegrationAsync(client);
+        client.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
+
+        var requestBody = new
+        {
+            headers = new { Authorization = "Bearer sk_live_super_secret_token_abc123" },
+            apiKey = "fi_live_should_never_be_stored_raw",
+            note = "contact jane.doe@example.com or call +1-555-234-5678"
+        };
+        var responseBody = new { client_secret = "cs_test_should_be_masked", status = "failed" };
+
+        var request = new IngestEventRequest(integrationId, "ApiCall", 401, requestBody, responseBody, 100, DateTimeOffset.UtcNow);
+        var response = await client.PostAsJsonAsync("/api/v1/events", request);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var body = await response.Content.ReadFromJsonAsync<IngestEventResponse>();
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<FiDbContext>();
+        var evt = await db.IntegrationEvents.FirstAsync(e => e.Id == body!.EventId);
+
+        evt.RequestRedacted.Should().NotBeNullOrEmpty();
+        evt.RequestRedacted.Should().NotContain("sk_live_super_secret_token_abc123");
+        evt.RequestRedacted.Should().NotContain("fi_live_should_never_be_stored_raw");
+        evt.RequestRedacted.Should().NotContain("jane.doe@example.com");
+        evt.RequestRedacted.Should().Contain("[REDACTED]");
+
+        evt.ResponseRedacted.Should().NotBeNullOrEmpty();
+        evt.ResponseRedacted.Should().NotContain("cs_test_should_be_masked");
+        evt.ResponseRedacted.Should().Contain("[REDACTED]");
     }
 }

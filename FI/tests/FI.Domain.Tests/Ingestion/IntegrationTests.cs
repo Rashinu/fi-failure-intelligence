@@ -59,4 +59,41 @@ public class IntegrationTests
         apiKey.IsActive.Should().BeTrue();
         apiKey.IntegrationId.Should().Be(integration.Id);
     }
+
+    [Fact]
+    public void RotateApiKey_RevokesPreviousActiveKeys_AndIssuesNewOne()
+    {
+        var integration = Integration.Create("Name", "stripe", "production", "owner", null, BusinessCriticality.Medium);
+        var originalKey = integration.IssueApiKey("fi_live_old1", "old-hash");
+
+        var newKey = integration.RotateApiKey("fi_live_new1", "new-hash");
+
+        originalKey.IsActive.Should().BeFalse();
+        newKey.IsActive.Should().BeTrue();
+        integration.ApiKeys.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void RotateApiKey_AlreadyRevokedKey_IsNotTouchedAgain()
+    {
+        var integration = Integration.Create("Name", "stripe", "production", "owner", null, BusinessCriticality.Medium);
+        var firstKey = integration.IssueApiKey("fi_live_first", "hash1");
+        firstKey.Revoke();
+
+        var secondKey = integration.RotateApiKey("fi_live_second", "hash2");
+
+        secondKey.IsActive.Should().BeTrue();
+        integration.ApiKeys.Should().HaveCount(2);
+        integration.ApiKeys.Count(k => k.IsActive).Should().Be(1);
+    }
+
+    [Fact]
+    public void IssueWebhookSecret_SetsSecret_AndUpdatesTimestamp()
+    {
+        var integration = Integration.Create("Name", "stripe", "production", "owner", null, BusinessCriticality.Medium);
+
+        integration.IssueWebhookSecret("whsec_abc123");
+
+        integration.WebhookSecret.Should().Be("whsec_abc123");
+    }
 }

@@ -108,7 +108,7 @@ public class IntegrationsController : ControllerBase
 
         var pepper = _configuration["ApiKeys:Pepper"] ?? "local-dev-pepper-change-me";
         var (rawKey, keyPrefix, keyHash) = GenerateApiKey(pepper);
-        var newApiKey = integration.RotateApiKey(keyPrefix, keyHash);
+        var newApiKey = integration.RotateApiKey(keyPrefix, keyHash, DateTimeOffset.UtcNow);
 
         // EF Core sadece "yeni eklenen çocuk"ı, ebeveyn Added durumundaysa cascade ile Added
         // işaretler. Burada Integration zaten var olan (Unchanged) bir varlık olduğundan,

@@ -27,6 +27,19 @@ public class ApiKeyTests
     }
 
     [Fact]
+    public void MarkRotated_SetsLastRotatedAt_ButKeepsKeyActive()
+    {
+        var apiKey = ApiKey.Create(Guid.NewGuid(), "fi_live_ab12", "hash");
+        var rotatedAt = DateTimeOffset.UtcNow;
+
+        apiKey.MarkRotated(rotatedAt);
+
+        apiKey.LastRotatedAt.Should().Be(rotatedAt);
+        apiKey.IsActive.Should().BeTrue();
+        apiKey.RevokedAt.Should().BeNull();
+    }
+
+    [Fact]
     public void RecordUsage_IncrementsUsageCountAndSetsLastUsedAt()
     {
         var apiKey = ApiKey.Create(Guid.NewGuid(), "fi_live_ab12", "hash");

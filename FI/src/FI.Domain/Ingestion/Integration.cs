@@ -85,15 +85,15 @@ public class Integration
     }
 
     /// <summary>
-    /// Bölüm 33.4 basit sadeleştirme: dokümandaki 24 saatlik grace period (rotasyondan sonra
-    /// eski key'in bir süre daha geçerli kalması) burada uygulanmadı — eski key(ler) anında
-    /// revoke edilir. Grace period, zamanlanmış bir revoke job'u gerektirir (post-MVP takip
-    /// konusu); MVP'de "anında rotasyon" daha basit ve öngörülebilir.
+    /// Bölüm 33.4 — eski key(ler) anında revoke edilmez; <c>MarkRotated</c> ile işaretlenir ve
+    /// 24 saatlik grace period boyunca geçerli kalır (ayrı bir zamanlanmış job, ApiKeyGracePeriod
+    /// dolduğunda revoke eder — bkz. ApiKeyGracePeriodRevocationJobHandler). Bu, rotasyonun hemen
+    /// ardından henüz güncellenmemiş istemcilerin kesintisiz çalışmasını sağlar.
     /// </summary>
-    public ApiKey RotateApiKey(string newKeyPrefix, string newKeyHash)
+    public ApiKey RotateApiKey(string newKeyPrefix, string newKeyHash, DateTimeOffset rotatedAt)
     {
         foreach (var key in _apiKeys.Where(k => k.IsActive))
-            key.Revoke();
+            key.MarkRotated(rotatedAt);
 
         return IssueApiKey(newKeyPrefix, newKeyHash);
     }

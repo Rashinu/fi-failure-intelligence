@@ -37,6 +37,9 @@ public class ApiKey
 
     public void Revoke() => RevokedAt = DateTimeOffset.UtcNow;
 
+    /// <summary>Bkz. Bölüm 33.4 — rotasyon anında revoke edilmez; grace period sonunda ayrı bir job tarafından revoke edilir.</summary>
+    public void MarkRotated(DateTimeOffset rotatedAt) => LastRotatedAt = rotatedAt;
+
     public void RecordUsage()
     {
         LastUsedAt = DateTimeOffset.UtcNow;

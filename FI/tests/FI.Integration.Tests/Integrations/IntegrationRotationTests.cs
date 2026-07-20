@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using FI.Application.Ingestion;
 using FI.Application.Integrations;
 using FI.Domain.Audit;
+using FI.Infrastructure.Jobs;
 using FI.Infrastructure.Persistence;
 using FI.Integration.Tests.Fixtures;
 using FluentAssertions;
@@ -39,7 +40,7 @@ public class IntegrationRotationTests : IClassFixture<FiApiFactory>
     }
 
     [Fact]
-    public async Task RotateApiKey_OldKeyStopsWorking_NewKeyWorks()
+    public async Task RotateApiKey_OldKeyStillWorksDuringGracePeriod_NewKeyAlsoWorks()
     {
         var client = _factory.CreateClient();
         var created = await CreateIntegrationAsync(client);
@@ -50,17 +51,50 @@ public class IntegrationRotationTests : IClassFixture<FiApiFactory>
         var rotated = await rotateResponse.Content.ReadFromJsonAsync<RotateApiKeyResponse>();
         rotated!.ApiKey.Should().NotBe(created.ApiKey);
 
+        // Bkz. Bolum 33.4 - grace period boyunca eski key hala calismali (henuz guncellenmemis
+        // istemcilerin kesintiye ugramamasi icin).
         var oldKeyClient = _factory.CreateClient();
         oldKeyClient.DefaultRequestHeaders.Add("X-Api-Key", created.ApiKey);
         var oldKeyRequest = new IngestEventRequest(created.IntegrationId, "ApiCall", 401, null, null, null, DateTimeOffset.UtcNow);
         var oldKeyResponse = await oldKeyClient.PostAsJsonAsync("/api/v1/events", oldKeyRequest);
-        oldKeyResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        oldKeyResponse.StatusCode.Should().Be(HttpStatusCode.Created);
 
         var newKeyClient = _factory.CreateClient();
         newKeyClient.DefaultRequestHeaders.Add("X-Api-Key", rotated.ApiKey);
         var newKeyRequest = new IngestEventRequest(created.IntegrationId, "ApiCall", 401, null, null, null, DateTimeOffset.UtcNow);
         var newKeyResponse = await newKeyClient.PostAsJsonAsync("/api/v1/events", newKeyRequest);
         newKeyResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public async Task ApiKeyGracePeriodRevocationJob_RevokesKeysPastGracePeriod_ButNotRecentlyRotatedOnes()
+    {
+        var client = _factory.CreateClient();
+        var created = await CreateIntegrationAsync(client);
+
+        var rotateResponse = await client.PostAsync($"/api/v1/integrations/{created.IntegrationId}/api-key/rotate", null);
+        rotateResponse.EnsureSuccessStatusCode();
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<FiDbContext>();
+            // Grace period'un (24sa) coktan dolmus oldugunu simule et.
+            var pastRotation = DateTimeOffset.UtcNow - ApiKeyGracePeriodRevocationJobHandler.GracePeriod - TimeSpan.FromMinutes(1);
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE api_keys SET last_rotated_at = {pastRotation} WHERE integration_id = {created.IntegrationId} AND revoked_at IS NULL AND last_rotated_at IS NOT NULL");
+        }
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var job = scope.ServiceProvider.GetRequiredService<ApiKeyGracePeriodRevocationJobHandler>();
+            await job.ExecuteAsync();
+        }
+
+        var oldKeyClient = _factory.CreateClient();
+        oldKeyClient.DefaultRequestHeaders.Add("X-Api-Key", created.ApiKey);
+        var oldKeyRequest = new IngestEventRequest(created.IntegrationId, "ApiCall", 401, null, null, null, DateTimeOffset.UtcNow);
+        var oldKeyResponse = await oldKeyClient.PostAsJsonAsync("/api/v1/events", oldKeyRequest);
+        oldKeyResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized, "grace period doldugu icin eski key artik revoke edilmis olmali");
     }
 
     [Fact]

@@ -234,14 +234,26 @@ doküman Bölüm 50).
   sürümü kullanır.
 - Coverage raporları (`coverlet`, cobertura formatı) her PR/push'ta artifact olarak yükleniyor.
 
+**M13 — API Key Rotasyonunda Grace Period tamamlandı.** Eklenenler:
+- `ApiKey.MarkRotated(rotatedAt)` — rotasyon anında eski key artık anında revoke edilmiyor,
+  yalnızca `LastRotatedAt` işaretleniyor (alan M7'den beri vardı ama hiç kullanılmıyordu).
+- `ApiKeyGracePeriodRevocationJobHandler` — saatte bir çalışan Hangfire recurring job,
+  `LastRotatedAt`'i 24 saati geçmiş ama henüz revoke edilmemiş key'leri revoke eder (Bölüm 33.4).
+- Davranış değişikliği: rotasyondan hemen sonra **hem eski hem yeni key çalışır** (grace period
+  boyunca) — henüz güncellenmemiş istemcilerin kesintiye uğramaması için. Eski key yalnızca
+  grace period job'u çalıştıktan sonra 401 döner.
+- Testler güncellendi: `RotateApiKey_OldKeyStopsWorking_NewKeyWorks` →
+  `RotateApiKey_OldKeyStillWorksDuringGracePeriod_NewKeyAlsoWorks` (artık eski key'in hâlâ
+  çalıştığını doğruluyor) + yeni `ApiKeyGracePeriodRevocationJob_RevokesKeysPastGracePeriod...`
+  testi (grace period'u geçmiş bir key'i simüle edip job'ın onu revoke ettiğini kanıtlıyor).
+
 **Henüz YOK:** gerçek şema validasyonu/timeout/network hatası tespiti, parse-fail durumunda 1 kez
 retry (Bölüm 26.2 — şu an doğrudan NEEDS_HUMAN_REVIEW), golden dataset'in gerçek Claude ile
 çalıştırılması (şu an yalnızca scripted/fake double ile doğrulandı), promote akışının CI'da bir
 zorunlu status check'e bağlanması (workflow var ama branch protection henüz yapılandırılmadı),
 canlı analiz sağlık metriklerine dayalı ek promotion koşulu (Bölüm 26.3'ün N=200 kuralı), Docker
-image'ının gerçek bir container registry'ye push edilmesi, API key rotasyonunda 24 saatlik grace
-period (Bölüm 33.4 — şu an anında revoke), Npgsql-özel trace span'ları, Seq/OTLP collector
-entegrasyonu (şu an yalnızca konsol exporter).
+image'ının gerçek bir container registry'ye push edilmesi, Npgsql-özel trace span'ları, Seq/OTLP
+collector entegrasyonu (şu an yalnızca konsol exporter).
 
 **Doğrulama durumu:** Build 0 hata/0 uyarı. 79/79 domain unit testi (AI validator'ın parse/
 echo/confidence/grounding senaryoları dahil) geçti. Entegrasyon testleri her sınıf **izole**
@@ -317,13 +329,14 @@ FI/
 Bağımlılık kuralı: `Domain` hiçbir şeye bağımlı değildir; `Application` yalnızca kendi
 arayüzlerine bağımlıdır; `Infrastructure` bu arayüzleri implemente eder; `Api` composition root'tur.
 
-## Sonraki Adımlar (Post-M12)
+## Sonraki Adımlar (Post-M13)
 
 14 günlük planın çekirdek zinciri (event → classify → fingerprint → incident → evidence →
 AI analiz → observability) artık uçtan uca çalışıyor; mock connector'lar (Bölüm 34-37), golden
 dataset/eval harness (Bölüm 26.4), PII/secret redaction pipeline'ı (Bölüm 33.3), evidence
-collector'ın 4 kaynağının tamamı (Bölüm 23), prompt version A/B/regresyon gate'i (Bölüm 26.3) ve
-CI/CD pipeline'ı (Bölüm 39) buna bağlandı. Kalan, kasıtlı olarak ertelenmiş işler:
+collector'ın 4 kaynağının tamamı (Bölüm 23), prompt version A/B/regresyon gate'i (Bölüm 26.3),
+CI/CD pipeline'ı (Bölüm 39) ve API key rotasyon grace period'u (Bölüm 33.4) buna bağlandı. Kalan,
+kasıtlı olarak ertelenmiş işler:
 - Golden dataset'in gerçek Anthropic API'ye karşı manuel çalıştırılması (maliyet/latency ölçümü
   + prompt kalitesi hakkında gerçek sinyal, Bölüm 49 Open Decision #1) — `PromptVersionPromotionService`
   bunun için hazır, yalnızca `IAiAnalysisClient` gerçek `AnthropicMessagesClient`'a bağlanmalı
@@ -331,7 +344,6 @@ CI/CD pipeline'ı (Bölüm 39) buna bağlandı. Kalan, kasıtlı olarak ertelenm
   (workflow dosyası hazır, repo ayarı henüz yapılmadı)
 - Docker image'ının gerçek bir container registry'ye (ör. GHCR) push edilmesi
 - Canlı analiz sağlık metriklerine (son N=200) dayalı ek promotion koşulu (Bölüm 26.3)
-- API key rotasyonunda 24 saatlik grace period (Bölüm 33.4 — şu an anında revoke)
 - Seq/OTLP collector entegrasyonu (şu an yalnızca konsol exporter)
 
 Bkz. `docs/FAILURE_INTELLIGENCE_ARCHITECTURE.md` Bölüm 43 (Post-MVP Roadmap) ve Bölüm 49

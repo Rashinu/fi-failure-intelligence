@@ -56,6 +56,7 @@ builder.Services.AddScoped<ClassifyJobHandler>();
 builder.Services.AddScoped<OutboxDispatcher>();
 builder.Services.AddScoped<EvidenceCollectorJobHandler>();
 builder.Services.AddScoped<AiAnalysisJobHandler>();
+builder.Services.AddScoped<ApiKeyGracePeriodRevocationJobHandler>();
 builder.Services.AddScoped<FI.Infrastructure.Eval.PromptVersionPromotionService>();
 
 // Bkz. Bolum 34 - Mock Stripe/GitHub/SES/SendGrid connector'lari, ProviderKey'e gore dictionary
@@ -121,6 +122,12 @@ RecurringJob.AddOrUpdate<OutboxDispatcher>(
     "outbox-dispatcher",
     dispatcher => dispatcher.DispatchPendingAsync(),
     "*/5 * * * * *");
+
+// Bölüm 33.4 - rotasyon grace period'u (24sa) dolan API key'leri saatte bir revoke eder.
+RecurringJob.AddOrUpdate<ApiKeyGracePeriodRevocationJobHandler>(
+    "api-key-grace-period-revocation",
+    handler => handler.ExecuteAsync(CancellationToken.None),
+    "0 * * * *");
 
 app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {

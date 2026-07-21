@@ -247,13 +247,37 @@ doküman Bölüm 50).
   çalıştığını doğruluyor) + yeni `ApiKeyGracePeriodRevocationJob_RevokesKeysPastGracePeriod...`
   testi (grace period'u geçmiş bir key'i simüle edip job'ın onu revoke ettiğini kanıtlıyor).
 
+**M14 — Golden Dataset'in Gerçek Claude Haiku'ya Karşı Çalıştırılması (Bölüm 49 Open Decision #1)
+tamamlandı.** `EvalHarness`, kullanıcının `dotnet user-secrets` ile ayarladığı gerçek
+`Ai:AnthropicApiKey` kullanılarak `AnthropicMessagesClient` üzerinden 20 senaryonun tamamına
+karşı çalıştırıldı (manuel, tek seferlik — CI'a otomatik bağlanmadı, çalıştırılan test dosyası
+doğrulama sonrası kaldırıldı; bkz. M8'in "manuel/opt-in kalır" kararı).
+
+**Gerçek sonuç (model: `claude-haiku-4-5`, mevcut `fi-root-cause-v1` prompt'u):**
+- **Genel ortalama: 0.726 — eşiğin (0.85) altında, `Passed=false`.**
+- Boyut bazlı: CategoryEcho 0.950, RootCauseAccuracy 0.950, Actionability 0.950,
+  ConfidenceCalibration 0.933, FormatCompliance 0.950 — bunlar güçlü.
+  **Grounding 0.100 ve NeedsHumanReviewAccuracy 0.250 — zayıf halkalar.**
+- 1 kritik FAIL: `contradictory-evidence` senaryosu (çelişkili evidence karşısında model beklenen
+  belirsizliği/needsHumanReview davranışını göstermedi).
+- **Bu, sistemin kendi güvenlik mekanizmasının çalıştığının kanıtı:** `PromptPromotionGate`
+  gerçek bir promote denemesinde bu prompt'u **haklı olarak reddederdi** — M11'de kurulan gate,
+  tam da bunun için var.
+- **Kök neden (yorum, kesin değil):** `Grounding` düşüklüğü muhtemelen `AiAnalysisValidator`'ın
+  basit kelime-örtüşme temelli kontrolünün (Bölüm 26.2, kendi dokümantasyonunda "kesin değil"
+  olarak işaretli) gerçek bir modelin doğal parafrazlamasını (evidence'taki sayıları/adları
+  birebir tekrar etmeden yeniden ifade etmesi) yanlışlıkla "evidence-dışı iddia" olarak
+  işaretlemesi. Bu, prompt'un "evidence'ı olabildiğince birebir tekrarla" talimatını
+  güçlendirerek veya grounding kontrolünü gevşeterek iyileştirilebilir — ikisi de bu oturumun
+  kapsamı dışında bırakıldı (bir sonraki adım).
+
 **Henüz YOK:** gerçek şema validasyonu/timeout/network hatası tespiti, parse-fail durumunda 1 kez
-retry (Bölüm 26.2 — şu an doğrudan NEEDS_HUMAN_REVIEW), golden dataset'in gerçek Claude ile
-çalıştırılması (şu an yalnızca scripted/fake double ile doğrulandı), promote akışının CI'da bir
-zorunlu status check'e bağlanması (workflow var ama branch protection henüz yapılandırılmadı),
-canlı analiz sağlık metriklerine dayalı ek promotion koşulu (Bölüm 26.3'ün N=200 kuralı), Docker
-image'ının gerçek bir container registry'ye push edilmesi, Npgsql-özel trace span'ları, Seq/OTLP
-collector entegrasyonu (şu an yalnızca konsol exporter).
+retry (Bölüm 26.2 — şu an doğrudan NEEDS_HUMAN_REVIEW), `fi-root-cause-v1` prompt'unun (veya
+grounding kontrolünün) golden dataset eşiğini geçecek şekilde iyileştirilmesi (M14'te ölçüldü,
+şu an geçmiyor), promote akışının CI'da bir zorunlu status check'e bağlanması, canlı analiz
+sağlık metriklerine dayalı ek promotion koşulu (Bölüm 26.3'ün N=200 kuralı), Docker image'ının
+gerçek bir container registry'ye push edilmesi, Npgsql-özel trace span'ları, Seq/OTLP collector
+entegrasyonu (şu an yalnızca konsol exporter).
 
 **Doğrulama durumu:** Build 0 hata/0 uyarı. 79/79 domain unit testi (AI validator'ın parse/
 echo/confidence/grounding senaryoları dahil) geçti. Entegrasyon testleri her sınıf **izole**
@@ -329,17 +353,19 @@ FI/
 Bağımlılık kuralı: `Domain` hiçbir şeye bağımlı değildir; `Application` yalnızca kendi
 arayüzlerine bağımlıdır; `Infrastructure` bu arayüzleri implemente eder; `Api` composition root'tur.
 
-## Sonraki Adımlar (Post-M13)
+## Sonraki Adımlar (Post-M14)
 
 14 günlük planın çekirdek zinciri (event → classify → fingerprint → incident → evidence →
 AI analiz → observability) artık uçtan uca çalışıyor; mock connector'lar (Bölüm 34-37), golden
 dataset/eval harness (Bölüm 26.4), PII/secret redaction pipeline'ı (Bölüm 33.3), evidence
 collector'ın 4 kaynağının tamamı (Bölüm 23), prompt version A/B/regresyon gate'i (Bölüm 26.3),
-CI/CD pipeline'ı (Bölüm 39) ve API key rotasyon grace period'u (Bölüm 33.4) buna bağlandı. Kalan,
-kasıtlı olarak ertelenmiş işler:
-- Golden dataset'in gerçek Anthropic API'ye karşı manuel çalıştırılması (maliyet/latency ölçümü
-  + prompt kalitesi hakkında gerçek sinyal, Bölüm 49 Open Decision #1) — `PromptVersionPromotionService`
-  bunun için hazır, yalnızca `IAiAnalysisClient` gerçek `AnthropicMessagesClient`'a bağlanmalı
+CI/CD pipeline'ı (Bölüm 39), API key rotasyon grace period'u (Bölüm 33.4) buna bağlandı; golden
+dataset gerçek Claude Haiku'ya karşı da çalıştırıldı (M14). Kalan, kasıtlı olarak ertelenmiş işler:
+- **`fi-root-cause-v1` prompt'unun (veya grounding kontrolünün) iyileştirilmesi** — M14'te ölçülen
+  gerçek skor (0.726) eşiği geçmiyor; en zayıf halkalar Grounding (0.100) ve
+  NeedsHumanReviewAccuracy (0.250). Yeni bir `DRAFT` prompt versiyonu oluşturup
+  `POST /api/v1/prompt-versions/{id}/promote` ile (gerçek `IAiAnalysisClient`'a bağlandıktan
+  sonra) tekrar denenebilir.
 - GitHub'da branch protection kuralının Build/Test/Migration Check'i zorunlu status check yapması
   (workflow dosyası hazır, repo ayarı henüz yapılmadı)
 - Docker image'ının gerçek bir container registry'ye (ör. GHCR) push edilmesi

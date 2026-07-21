@@ -120,17 +120,37 @@ jobs:
   docker-build:
     needs: migration-check
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
+      # ghcr.io imaj adlari kucuk harf olmak zorunda; repository_owner buyuk harf icerebilir.
+      - name: Compute image name
+        id: image
+        run: echo "name=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/fi-api" >> "$GITHUB_OUTPUT"
+
       - name: Build Docker image
         run: |
-          time docker build -f docker/Dockerfile -t fi-api:${{ github.sha }} .
-          docker image inspect fi-api:${{ github.sha }} --format='Image size: {{.Size}} bytes'
+          time docker build -f docker/Dockerfile \
+            -t ${{ steps.image.outputs.name }}:${{ github.sha }} \
+            -t ${{ steps.image.outputs.name }}:latest .
+          docker image inspect ${{ steps.image.outputs.name }}:${{ github.sha }} --format='Image size: {{.Size}} bytes'
 
-      # Bkz. Bolum 39 - "main branch'te push". Bu is akisi henuz bir gercek registry
-      # yapilandirmiyor (kapsam disi - bkz. README Sonraki Adimlar); sadece imajin basariyla
-      # build edildigini dogrular ve boyutunu/suresini loglar.
-      - name: Push (main branch only)
-        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
-        run: echo "Push adimi henuz bir container registry'ye baglanmadi - bkz. README Sonraki Adimlar."
+      # Bkz. Bolum 39 - "main branch'te push". Fork'lardan gelen PR'larda secrets.GITHUB_TOKEN
+      # yazma iznine sahip olmadigindan (ve push edilmemesi de dogru oldugundan) yalnizca
+      # push event'inde ve master/main dalinda calisir.
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push to GHCR
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+        run: |
+          docker push ${{ steps.image.outputs.name }}:${{ github.sha }}
+          docker push ${{ steps.image.outputs.name }}:latest

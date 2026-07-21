@@ -61,12 +61,40 @@ jobs:
 
       # Testcontainers gercek bir PostgreSQL container'i indirir/calistirir - ubuntu-latest'te
       # Docker onceden kurulu ve calisir durumda oldugundan ek bir docker-in-docker adimi gerekmez.
-      - name: Integration + E2E tests (FI.Integration.Tests, Testcontainers)
-        run: >
-          dotnet test tests/FI.Integration.Tests/FI.Integration.Tests.csproj
-          --configuration Release
-          --collect:"XPlat Code Coverage"
-          --results-directory ./coverage/integration
+      #
+      # Her sinifi AYRI bir "dotnet test" cagrisinda (ayri process) calistiriyoruz: ayni process
+      # icinde art arda pek cok Testcontainers-agirlikli sinif calistirmak (xunit.runner.json'da
+      # parallelizeTestCollections=false olsa bile) hem yerelde hem CI runner'da ara sira
+      # "Connection refused" ile sonuclanan bir baglanti kararsizligina yol aciyor (README'de M6
+      # notundan beri bilinen bir ortam siniri). Yeni bir Testcontainers-agirlikli test sinifi
+      # eklendiginde bu listeye de eklenmelidir.
+      - name: Integration + E2E tests (FI.Integration.Tests, one class per process)
+        run: |
+          set -e
+          classes=(
+            "AiAnalysis.AiAnalysisPipelineTests"
+            "AiAnalysis.PromptVersionPromotionTests"
+            "Classification.ClassificationToIncidentTests"
+            "Connectors.EmailDeliveryConnectorTests"
+            "Connectors.GitHubDeploymentConnectorTests"
+            "Connectors.StripeConnectorTests"
+            "Connectors.StripeWebhookIngestionTests"
+            "Eval.GoldenDatasetEvalTests"
+            "Evidence.EvidenceCollectionTests"
+            "Ingestion.DeploymentIngestionTests"
+            "Ingestion.EventIngestionTests"
+            "Integrations.IntegrationCrudTests"
+            "Integrations.IntegrationRotationTests"
+          )
+          for cls in "${classes[@]}"; do
+            echo "::group::$cls"
+            dotnet test tests/FI.Integration.Tests/FI.Integration.Tests.csproj \
+              --configuration Release \
+              --filter "FullyQualifiedName~FI.Integration.Tests.$cls" \
+              --collect:"XPlat Code Coverage" \
+              --results-directory "./coverage/integration/$cls"
+            echo "::endgroup::"
+          done
 
       - name: Upload coverage artifact
         if: always()

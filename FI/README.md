@@ -353,7 +353,41 @@ FI/
 Bağımlılık kuralı: `Domain` hiçbir şeye bağımlı değildir; `Application` yalnızca kendi
 arayüzlerine bağımlıdır; `Infrastructure` bu arayüzleri implemente eder; `Api` composition root'tur.
 
-## Sonraki Adımlar (Post-M14)
+**M15 — Gerçek Docker Compose Uçtan Uca Testi + Kritik Concurrency Düzeltmesi tamamlandı.**
+Bu oturuma kadar tüm testler `WebApplicationFactory` (in-process test host) üzerinden
+çalıştırılmıştı; job handler'lar da testlerde hep SIRAYLA, doğrudan çağrılıyordu. İlk kez
+`docker compose up` ile gerçek container'lar halinde ayağa kaldırılıp gerçek HTTP istekleriyle
+(curl, imzalı webhook, API key rotasyonu) uçtan uca test edildi.
+
+**Bulunan ve düzeltilen kritik bug:** Hangfire varsayılan olarak 20 paralel worker ile
+çalışıyor; aynı fingerprint'e ait event'ler gerçekten eşzamanlı geldiğinde (ör. bir entegrasyonun
+attığı hata patlaması), birden fazla `ClassifyJob` aynı incident satırını aynı anda okuyup
+güncelliyordu. Bu iki farklı hataya yol açtı:
+- Birden fazla job aynı anda "incident yok" görüp aynı fingerprint için INSERT denemesi →
+  Postgres UNIQUE ihlali (`23505`).
+- Birden fazla job var olan incident'ı okuyup `EventCount++` yapması → son yazan kazanır, ara
+  artışlar kaybolur ("lost update"). 8 event'lik gerçek bir paralel yük testinde `EventCount`
+  8 yerine 4 çıktı.
+
+**Düzeltme:** `Incident`, Postgres'in `xmin` sistem sütununu optimistic concurrency token
+olarak kullanıyor (`IncidentConfiguration`); `ClassifyJobHandler` artık hem concurrency-token
+çakışmasını (`DbUpdateConcurrencyException`) hem UNIQUE ihlalini (`23505`) yakalayıp tüm
+sınıflandırma+upsert işlemini sıfırdan yeniden deniyor (`ChangeTracker.Clear()` + retry, en
+fazla 5 deneme). Aynı 8 event'lik paralel yük testi tekrar çalıştırıldığında `EventCount=8`
+doğru sonucunu verdi (20 retry olayı loglandı, hepsi başarıyla çözüldü).
+
+**Ayrıca canlı olarak doğrulanan davranışlar:** webhook imza doğrulama, ingestion→classify→
+incident zinciri, evidence yoksa "uydurma yok, direkt NEEDS_HUMAN_REVIEW" davranışı, API key
+rotasyonu + audit log yazımı, ve **CONFIG_CHANGE evidence'ının gerçek bir rotasyon olayını
+doğru zaman penceresinde yakalaması** ("API key rotated for integration '...' 0 minute(s)
+before first failure").
+
+**Önemli çıkarım:** Bu bug, `WebApplicationFactory`+sıralı-job-çağrısı temelli testlerin asla
+yakalayamayacağı türden bir sınıf — gerçek eşzamanlı üretim trafiği simüle edilmeden ortaya
+çıkmıyordu. Bu, "iyi test edilmiş" ile "üretim trafiğinde doğrulanmış" arasındaki farkı somut
+şekilde gösteriyor.
+
+## Sonraki Adımlar (Post-M15)
 
 14 günlük planın çekirdek zinciri (event → classify → fingerprint → incident → evidence →
 AI analiz → observability) artık uçtan uca çalışıyor; mock connector'lar (Bölüm 34-37), golden

@@ -36,5 +36,13 @@ public class IncidentConfiguration : IEntityTypeConfiguration<Incident>
         builder.HasIndex(i => new { i.Severity, i.Status });
 
         builder.HasOne<Integration>().WithMany().HasForeignKey(i => i.IntegrationId).OnDelete(DeleteBehavior.Cascade);
+
+        // Gercek Docker Compose ortaminda (Hangfire 20 paralel worker) ayni fingerprint'e ait
+        // birden fazla ClassifyJob'un ES ZAMANLI calisip EventCount++ gibi read-modify-write
+        // artislarini birbirinin uzerine yazmasi (lost update) canli bir E2E testinde bulundu.
+        // Postgres'in xmin sistem sutunu optimistic concurrency token olarak kullanilir; catisma
+        // olursa DbUpdateConcurrencyException firlar ve ClassifyJobHandler tum islemi yeniden
+        // dener (bkz. ClassifyJobHandler.ExecuteAsync).
+        builder.Property<uint>("xmin").IsRowVersion();
     }
 }

@@ -5,6 +5,7 @@ using FI.Domain.Outbox;
 using FI.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 
 namespace FI.Infrastructure.Jobs;
 
@@ -15,9 +16,23 @@ namespace FI.Infrastructure.Jobs;
 /// reopen/reset-as-new-occurrence olduğunda EvidenceCollectorJob outbox'a yazılır — zaten
 /// aktif bir incident'a bağlanan her tekrar event için evidence yeniden toplanmaz (Bölüm 23).
 /// AI analiz adımı (M5) bu job'a henüz bağlı değil.
+///
+/// Eşzamanlılık notu: Hangfire birden fazla worker'la (varsayılan 20) paralel çalıştığından,
+/// aynı fingerprint'e ait event'ler için birden fazla ClassifyJob aynı anda çalışabilir. Bu iki
+/// farklı çakışma biçimine yol açar (ikisi de canlı bir Docker Compose yük testinde gözlemlendi):
+/// (1) Birden fazla job aynı anda "incident yok" görüp aynı fingerprint için INSERT dener →
+/// Postgres UNIQUE(integration_id, fingerprint, fingerprint_algorithm_version) ihlali (23505).
+/// (2) Birden fazla job var olan incident'ı okuyup EventCount++ yapar → son yazan kazanır, ara
+/// artışlar kaybolur ("lost update"). (2) için Incident, Postgres'in xmin sütununu optimistic
+/// concurrency token olarak kullanır (bkz. IncidentConfiguration). Her iki durumda da tüm
+/// sınıflandırma+upsert işlemi sıfırdan yeniden denenir; ikinci denemede "existingIncident"
+/// artık diğer job'ın commit ettiği satırı bulur ve doğru dalı (RecordNewEvent) izler.
 /// </summary>
 public class ClassifyJobHandler
 {
+    private const int MaxConcurrencyRetries = 5;
+    private const string UniqueViolationSqlState = "23505";
+
     private readonly FiDbContext _db;
     private readonly ILogger<ClassifyJobHandler> _logger;
 
@@ -28,6 +43,30 @@ public class ClassifyJobHandler
     }
 
     public async Task ExecuteAsync(Guid eventId, Guid correlationId, CancellationToken cancellationToken = default)
+    {
+        for (var attempt = 1; attempt <= MaxConcurrencyRetries; attempt++)
+        {
+            try
+            {
+                await ClassifyAndUpsertIncidentAsync(eventId, correlationId, cancellationToken);
+                return;
+            }
+            catch (DbUpdateException ex) when (attempt < MaxConcurrencyRetries && IsConcurrencyConflict(ex))
+            {
+                _db.ChangeTracker.Clear();
+                _logger.LogWarning(ex,
+                    "ClassifyJob: event {EventId} için incident güncellemesi eşzamanlılık çakışması nedeniyle {Attempt}. kez yeniden deneniyor.",
+                    eventId, attempt);
+                await Task.Delay(TimeSpan.FromMilliseconds(50 * attempt), cancellationToken);
+            }
+        }
+    }
+
+    private static bool IsConcurrencyConflict(DbUpdateException ex) =>
+        ex is DbUpdateConcurrencyException ||
+        ex.InnerException is PostgresException { SqlState: UniqueViolationSqlState };
+
+    private async Task ClassifyAndUpsertIncidentAsync(Guid eventId, Guid correlationId, CancellationToken cancellationToken)
     {
         var evt = await _db.IntegrationEvents.FirstOrDefaultAsync(e => e.Id == eventId, cancellationToken);
         if (evt is null)

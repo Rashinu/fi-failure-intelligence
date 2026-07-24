@@ -1,5 +1,6 @@
 using System.Text.Json;
 using FI.Application.Incidents;
+using FI.Domain.Classification;
 using FI.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -60,7 +61,8 @@ public class IncidentsController : ControllerBase
             i.Status.ToString(),
             i.FirstSeen,
             i.LastSeen,
-            i.EventCount)).ToList();
+            i.EventCount,
+            SuggestedActionCatalog.For(i.Category))).ToList();
 
         return Ok(new IncidentListResponse(items, page, pageSize, totalCount));
     }
@@ -106,6 +108,7 @@ public class IncidentsController : ControllerBase
             incident.EventCount,
             incident.ReopenCount,
             incident.Fingerprint,
+            SuggestedActionCatalog.For(incident.Category),
             evidence,
             latestAnalysis));
     }

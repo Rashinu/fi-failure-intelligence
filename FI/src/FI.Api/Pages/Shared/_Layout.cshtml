@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@(ViewData["Title"] is string t ? $"{t} — FI" : "FI — Failure Intelligence")</title>
+    <link rel="stylesheet" href="~/css/site.css" />
+</head>
+<body>
+    <header class="fi-header">
+        <a class="fi-brand" href="/Incidents">FI <span>Failure Intelligence</span></a>
+        <nav>
+            <a href="/Incidents">Incidents</a>
+            <a href="/swagger">API</a>
+            <a href="/hangfire">Jobs</a>
+        </nav>
+    </header>
+    <main class="fi-main">
+        @RenderBody()
+    </main>
+</body>
+</html>

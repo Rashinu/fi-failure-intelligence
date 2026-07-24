@@ -8,7 +8,8 @@ public sealed record IncidentListItemResponse(
     string Status,
     DateTimeOffset FirstSeen,
     DateTimeOffset LastSeen,
-    int EventCount);
+    int EventCount,
+    string SuggestedAction);
 
 public sealed record IncidentListResponse(
     IReadOnlyList<IncidentListItemResponse> Items,
@@ -47,5 +48,6 @@ public sealed record IncidentDetailResponse(
     int EventCount,
     int ReopenCount,
     string Fingerprint,
+    string SuggestedAction,
     IReadOnlyList<IncidentEvidenceResponse> Evidence,
     AiAnalysisResponse? LatestAnalysis);

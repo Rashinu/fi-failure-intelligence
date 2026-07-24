@@ -31,6 +31,11 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Bkz. docs/CTO_REVIEW_ANALYSIS.md M17 (Product Proof) - mevcut Product API'nin uzerine ince
+// bir Razor Pages sunum katmani (Incident Dashboard/Detail); ayri bir frontend projesi/deploy
+// gerektirmez.
+builder.Services.AddRazorPages();
+
 builder.Services.AddFiPersistence();
 builder.Services.AddFiBackgroundJobs();
 builder.Services.AddFiConnectors();
@@ -78,12 +83,14 @@ if (app.Environment.IsDevelopment())
 app.UseSerilogRequestLogging();
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<ApiKeyAuthMiddleware>();
 
 app.UseAuthorization();
 app.MapControllers();
+app.MapRazorPages();
 
 app.UseHangfireDashboard("/hangfire");
 

@@ -418,20 +418,37 @@ gerçek bir Docker Compose ortamında (bir dış CI değil) uçtan uca doğrulan
 - Test fixture'ı (`FiApiFactory`) migration artık otomatik olmadığı için güncellendi — testler
   gerçek deploy pipeline'ındaki ayrı migration adımını taklit ederek migration'ı açıkça çağırıyor.
 
-## Sonraki Adımlar (Post-M16)
+**M17 — Product Proof tamamlandı.** CTO review'ün Faz 1 kalemi: sistemin ürettiği hiçbir veri
+daha önce görsel olarak gösterilmiyordu (yalnızca Swagger/JSON API vardı). Eklenenler:
 
-14 günlük planın çekirdek zinciri **ve** CTO review'ün "Faz 2 — Production Readiness" kalemleri
-tamamlandı (bkz. `docs/CTO_REVIEW_ANALYSIS.md`). Motor artık hem işlevsel olarak eksiksiz hem de
-üretim sertliğine sahip. Kalan iş, backend'e yeni özellik eklemek değil:
+- **Incident Dashboard** (`/Incidents`) — severity/status filtreli liste, `GET /api/v1/incidents`
+  ile aynı veriyi okur (aynı process içinde `FiDbContext` üzerinden, ayrı bir HTTP çağrısı yok).
+- **Incident Detail** (`/Incidents/Detail/{id}`) — timeline (ilk hata → evidence toplama →
+  AI analizi, kronolojik), evidence kartları (kaynak tipine göre), AI özeti + confidence bar +
+  "insan incelemesi gerekiyor mu" rozeti, AI analizi henüz yoksa dürüst bir boş durum mesajı.
+- **Deterministik "Suggested Action"** (`SuggestedActionCatalog`, `FI.Domain.Classification`) —
+  11 kategorinin her biri için sabit, anında görünen bir öneri ("API key'in geçerliliğini
+  kontrol edin" vb.); AI'nin serbest metin önerilerinden bağımsız, evidence toplanmadan/AI
+  çağrısı yapılmadan bile hemen görünür. `IncidentListItemResponse`/`IncidentDetailResponse`'a
+  `suggestedAction` alanı olarak da eklendi (API tüketicileri için).
+- **Teknoloji:** Razor Pages, `FI.Api` içine gömülü (ayrı bir frontend projesi/deploy yok) —
+  proje ortamındaki karar gereği.
+- **`scripts/seed-demo-data.sh`** — gerçek imzalı webhook'larla 3 gerçekçi senaryo üretir
+  (API key rotasyonu sonrası auth patlaması, rate limit, provider outage). Gerçek Docker Compose
+  ortamında çalıştırılıp dashboard ve detail sayfalarının doğru render ettiği doğrulandı —
+  CONFIG_CHANGE evidence'ı (rotasyondan), PreviousEvent evidence'ı ve timeline'ı dahil.
 
-- **M17 — Product Proof (en yüksek öncelik):** Sistemin ürettiği hiçbir veri şu an görsel olarak
-  gösterilmiyor — yalnızca Swagger/JSON API var. Incident dashboard, incident detail (timeline,
-  evidence kartları, AI summary), demo seed data. Bkz. `docs/CTO_REVIEW_ANALYSIS.md` M16 (orada
-  farklı numaralandırılmış).
-- **M18 — Incident Intelligence:** Deterministik "suggested action" kuralları (401→API key
-  kontrol et vb.), affected-customer alanı, business-impact özet endpoint'i.
+## Sonraki Adımlar (Post-M17)
+
+14 günlük planın çekirdek zinciri, CTO review'ün Faz 1 (Product Proof) ve Faz 2 (Production
+Readiness) kalemleri tamamlandı (bkz. `docs/CTO_REVIEW_ANALYSIS.md`). Kalan iş:
+
+- **M18 — Incident Intelligence:** Affected-customer alanı (connector'ların `NormalizedEvent`'e
+  müşteri kimliği eklemesi gerekir, şema değişikliği), business-impact özet endpoint'i.
 - **M19 — Customer Validation:** Gerçek kullanıcılarla (entegrasyon geliştiricisi, support
-  mühendisi, otomasyon danışmanı) M17 demo'sunu doğrulamak.
+  mühendisi, otomasyon danışmanı) M17 demo'sunu doğrulamak — "Bugün aynı problemi çözmek için
+  hangi ekranlara bakıyorsunuz?"
+- Demo video/GIF kaydı (dashboard artık hazır).
 - `fi-root-cause-v1` prompt'unun iyileştirilmesi — M14'te ölçülen skor (0.726) eşiği geçmiyor,
   en zayıf halkalar Grounding (0.100) ve NeedsHumanReviewAccuracy (0.250).
 - Canlı analiz sağlık metriklerine (son N=200) dayalı ek promotion koşulu (Bölüm 26.3).

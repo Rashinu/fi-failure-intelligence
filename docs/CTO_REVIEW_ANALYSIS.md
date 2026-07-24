@@ -101,20 +101,12 @@ ayrıntı için `FI/README.md`'deki M16 notuna bakın:
    `docker-compose.yml`'de ayrı `fi-migrate` servisi.
 5. ~~OTLP exporter ekle~~ — `Otel:OtlpEndpoint` yapılandırılırsa devreye giriyor.
 
-### M17 — Product Proof (Faz 1, en yüksek öncelik — sıradaki iş)
+### M17 — Product Proof (Faz 1) — ✅ TAMAMLANDI
 
-Hedef: **"5 dakikada ürünün değerini gösterebilmek."** Yeni backend özelliği eklenmez; tamamen
-mevcut API'nin üzerine ince bir sunum katmanı.
-
-| Öğe | Kaynak (zaten var mı?) |
-|---|---|
-| Incident Dashboard (liste, severity/status filtresi) | `GET /api/v1/incidents` zaten var |
-| Incident Detail (timeline, evidence kartları) | `GET /api/v1/incidents/{id}` zaten evidence+analysis dönüyor |
-| Evidence Cards (deploy/previous-event/historical/config-change) | Veri zaten var, kart tasarımı yeni |
-| AI Summary + Confidence + Needs Human Review rozeti | `latestAnalysis` alanı zaten dönüyor |
-| Suggested Action (deterministik) | **Yeni** — bkz. 2.4, küçük bir backend eklentisi gerekir |
-| Docker demo + seed data script | Mock connector'lar zaten var; yalnızca seed script yazılmalı |
-| Demo video/GIF | Dashboard bittikten sonra kaydedilir |
+Razor Pages (FI.Api'ye gömülü) ile Incident Dashboard + Detail (timeline, evidence kartları,
+AI summary, deterministik suggested action) eklendi; gerçek Docker Compose ortamında
+`scripts/seed-demo-data.sh` ile üretilen gerçekçi senaryolarla doğrulandı. Ayrıntı için
+`FI/README.md`'deki M17 notuna bakın. Yalnızca demo video/GIF kaydı (kod dışı bir iş) kaldı.
 
 Teknoloji seçimi: ayrı bir frontend projesi (React/Next.js) mi, yoksa Razor Pages/Blazor ile
 `FI.Api`'ye gömülü basit bir sunum mu — bu bir **ürün kararı**, koda başlamadan önce netleşmeli.

@@ -1,0 +1,131 @@
+@page "{id:guid}"
+@model FI.Api.Pages.Incidents.DetailModel
+@{
+    ViewData["Title"] = "Incident Detail";
+}
+
+<a class="fi-back" href="/Incidents">&larr; Incidents</a>
+
+<div class="fi-detail-header">
+    <div>
+        <h1 class="fi-page-title">@Model.IntegrationName — @Model.Category</h1>
+        <div class="fi-detail-meta">
+            İlk görülme @Model.FirstSeen.ToLocalTime().ToString("g") ·
+            Son görülme @Model.LastSeen.ToLocalTime().ToString("g") ·
+            @Model.EventCount event
+            @if (Model.ReopenCount > 0) { <text> · @Model.ReopenCount kez reopen</text> }
+        </div>
+    </div>
+    <div>
+        <span class="fi-badge @SeverityBadgeClass(Model.Severity)">@Model.Severity</span>
+        <span class="fi-badge @StatusBadgeClass(Model.Status)">@Model.Status</span>
+    </div>
+</div>
+
+<div class="fi-section">
+    <h2>Şimdi ne yapmalıyım?</h2>
+    <div class="fi-suggested-action"><strong>Önerilen ilk adım:</strong> @Model.SuggestedAction</div>
+</div>
+
+@if (Model.LatestAnalysis is not null)
+{
+    <div class="fi-section">
+        <h2>AI Analizi</h2>
+        <div class="fi-card fi-ai-card">
+            <p class="fi-ai-title">@Model.LatestAnalysis.Title</p>
+            <p>@Model.LatestAnalysis.ProbableRootCause</p>
+            <div class="fi-ai-row">
+                <div>
+                    <strong>Confidence</strong>
+                    <div class="fi-confidence-bar"><div class="fi-confidence-fill" style="width:@((int)(Model.LatestAnalysis.Confidence * 100))%"></div></div>
+                    @((int)(Model.LatestAnalysis.Confidence * 100))%
+                </div>
+                <div>
+                    <strong>İnsan incelemesi gerekiyor mu?</strong>
+                    <span class="fi-badge @(Model.LatestAnalysis.NeedsHumanReview ? "fi-badge-review" : "fi-badge-analyzed")">
+                        @(Model.LatestAnalysis.NeedsHumanReview ? "Evet" : "Hayır")
+                    </span>
+                </div>
+            </div>
+            @if (Model.LatestAnalysis.RecommendedActions.Count > 0)
+            {
+                <div>
+                    <strong style="display:block;color:var(--fi-text-muted);font-weight:500;font-size:0.76rem;text-transform:uppercase;letter-spacing:0.03em;margin-bottom:6px;">AI'nin önerdiği aksiyonlar</strong>
+                    <ul class="fi-actions-list">
+                        @foreach (var a in Model.LatestAnalysis.RecommendedActions)
+                        {
+                            <li>@a</li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <div class="fi-section">
+        <h2>AI Analizi</h2>
+        <div class="fi-empty">
+            Henüz bir AI analizi yok — evidence toplanıyor veya evidence yetersiz olduğu için
+            analiz atlandı (bkz. Bölüm 24.1: evidence yoksa AI çağrısı hiç yapılmaz).
+        </div>
+    </div>
+}
+
+<div class="fi-section">
+    <h2>Evidence (@Model.Evidence.Count)</h2>
+    @if (Model.Evidence.Count == 0)
+    {
+        <div class="fi-empty">Bu incident için evidence bulunamadı.</div>
+    }
+    else
+    {
+        <div class="fi-evidence-list">
+            @foreach (var e in Model.Evidence)
+            {
+                <div class="fi-evidence-card">
+                    <div class="fi-evidence-source">@e.SourceType</div>
+                    <div class="fi-evidence-summary">@e.Summary</div>
+                    <div class="fi-evidence-time">@e.CollectedAt.ToLocalTime().ToString("g")</div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<div class="fi-section">
+    <h2>Timeline</h2>
+    <div class="fi-timeline">
+        @foreach (var t in Model.Timeline)
+        {
+            <div class="fi-timeline-item">
+                <div>@t.Label</div>
+                <div class="fi-timeline-time">@t.At.ToLocalTime().ToString("g")</div>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="fi-section">
+    <h2>Fingerprint</h2>
+    <div class="fi-card" style="font-family:monospace;font-size:0.82rem;word-break:break-all;">@Model.Fingerprint</div>
+</div>
+
+@functions {
+    string SeverityBadgeClass(string severity) => severity switch
+    {
+        "Critical" => "fi-badge-critical",
+        "High" => "fi-badge-high",
+        "Medium" => "fi-badge-medium",
+        "Low" => "fi-badge-low",
+        _ => "fi-badge-neutral"
+    };
+
+    string StatusBadgeClass(string status) => status switch
+    {
+        "NeedsHumanReview" => "fi-badge-review",
+        "AiAnalyzed" or "Resolved" => "fi-badge-analyzed",
+        _ => "fi-badge-neutral"
+    };
+}

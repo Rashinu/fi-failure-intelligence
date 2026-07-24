@@ -23,6 +23,15 @@
 </div>
 
 <div class="fi-section">
+    <h2>İş Etkisi</h2>
+    <div class="fi-ai-row fi-card">
+        <div><strong>Etkilenen istek</strong>@Model.EventCount</div>
+        <div><strong>Etkilenen müşteri</strong>@(Model.AffectedCustomerCount is { } c ? c.ToString() : "bilinmiyor (provider bu veriyi taşımıyor)")</div>
+        <div><strong>Süre</strong>@FormatDuration(Model.LastSeen - Model.FirstSeen)</div>
+    </div>
+</div>
+
+<div class="fi-section">
     <h2>Şimdi ne yapmalıyım?</h2>
     <div class="fi-suggested-action"><strong>Önerilen ilk adım:</strong> @Model.SuggestedAction</div>
 </div>
@@ -113,6 +122,12 @@ else
 </div>
 
 @functions {
+    string FormatDuration(TimeSpan duration) => duration.TotalMinutes < 1
+        ? "< 1 dakika"
+        : duration.TotalHours < 1
+            ? $"{(int)duration.TotalMinutes} dakika"
+            : $"{(int)duration.TotalHours} saat {(int)duration.Minutes} dakika";
+
     string SeverityBadgeClass(string severity) => severity switch
     {
         "Critical" => "fi-badge-critical",

@@ -27,8 +27,10 @@ create_integration() {
 }
 
 send_stripe_event() {
-  local integration_id="$1" secret="$2" status_code="$3" error_code="$4" event_id="$5"
-  local body="{\"type\":\"charge.failed\",\"httpStatusCode\":$status_code,\"data\":{\"object\":{\"id\":\"$event_id\"}},\"error\":{\"code\":\"$error_code\"}}"
+  local integration_id="$1" secret="$2" status_code="$3" error_code="$4" event_id="$5" customer_id="${6:-}"
+  local object_json="\"id\":\"$event_id\""
+  [ -n "$customer_id" ] && object_json="$object_json,\"customer\":\"$customer_id\""
+  local body="{\"type\":\"charge.failed\",\"httpStatusCode\":$status_code,\"data\":{\"object\":{$object_json}},\"error\":{\"code\":\"$error_code\"}}"
   local sig
   sig=$(sign_stripe "$secret" "$body")
   curl -s -X POST "$BASE_URL/api/v1/webhooks/stripe/$integration_id/events" \
@@ -46,7 +48,9 @@ SECRET_1=$(echo "$OUT1" | grep -o '"webhookSecret":"[^"]*"' | cut -d'"' -f4)
 curl -s -X POST "$BASE_URL/api/v1/integrations/$INTEGRATION_1/api-key/rotate" > /dev/null
 
 for i in 1 2 3 4 5 6; do
-  send_stripe_event "$INTEGRATION_1" "$SECRET_1" 401 "invalid_api_key" "ch_demo_auth_$i"
+  # ilk 3 event ayni musteriye ait - "kac musteri etkilendi" farkli bir sayi (4) gostersin.
+  customer=$([ "$i" -le 3 ] && echo "cus_demo_a" || echo "cus_demo_$i")
+  send_stripe_event "$INTEGRATION_1" "$SECRET_1" 401 "invalid_api_key" "ch_demo_auth_$i" "$customer"
   sleep 0.2
 done
 

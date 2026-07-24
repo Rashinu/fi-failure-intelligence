@@ -111,13 +111,15 @@ AI summary, deterministik suggested action) eklendi; gerçek Docker Compose orta
 Teknoloji seçimi: ayrı bir frontend projesi (React/Next.js) mi, yoksa Razor Pages/Blazor ile
 `FI.Api`'ye gömülü basit bir sunum mu — bu bir **ürün kararı**, koda başlamadan önce netleşmeli.
 
-### M18 — Incident Intelligence (Faz 3)
+### M18 — Incident Intelligence (Faz 3) — ✅ TAMAMLANDI
 
-1. Deterministik "Suggested Action" kural motoru (11 kategori → sabit öneri metni).
-2. "Kaç müşteri etkilendi" — connector'ların `NormalizedEvent`'e affected-customer alanı
-   eklemesi + `IntegrationEvent`'e bu alanın taşınması (şema değişikliği gerektirir).
-3. Business Impact özet endpoint'i (mevcut `EventCount`/`FirstSeen`/`LastSeen`'i tek bir
-   "impact summary" görünümünde birleştirmek — asıl veri zaten var).
+1. ~~Deterministik "Suggested Action" kural motoru~~ — M17'de tamamlandı (`SuggestedActionCatalog`).
+2. ~~"Kaç müşteri etkilendi"~~ — `NormalizedEvent`/`IntegrationEvent`'e `AffectedCustomerRef`
+   eklendi (şema değişikliği + migration), `StripeConnector` mock payload'dan çıkarıyor.
+3. ~~Business Impact özet~~ — Incident Detail sayfasında ve API'de yeni "İş Etkisi" bölümü
+   (`EventCount` + tekil müşteri sayısı + süre). Gerçek Docker Compose ortamında (fresh DB,
+   migration'dan itibaren) doğrulandı; ayrıntı ve bu süreçte bulunup düzeltilen bir eşzamanlılık
+   bug'ı için `FI/README.md`'deki M18 notuna bakın.
 
 ### M19 — Customer Validation
 

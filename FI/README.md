@@ -438,13 +438,34 @@ daha önce görsel olarak gösterilmiyordu (yalnızca Swagger/JSON API vardı). 
   ortamında çalıştırılıp dashboard ve detail sayfalarının doğru render ettiği doğrulandı —
   CONFIG_CHANGE evidence'ı (rotasyondan), PreviousEvent evidence'ı ve timeline'ı dahil.
 
-## Sonraki Adımlar (Post-M17)
+**M18 — Incident Intelligence tamamlandı.** CTO review'ün Faz 3 kalemi: "kaç müşteri etkilendi"
+sorusuna cevap veren business-impact özeti.
 
-14 günlük planın çekirdek zinciri, CTO review'ün Faz 1 (Product Proof) ve Faz 2 (Production
-Readiness) kalemleri tamamlandı (bkz. `docs/CTO_REVIEW_ANALYSIS.md`). Kalan iş:
+- **`AffectedCustomerRef`** — `IntegrationEvent` ve `NormalizedEvent`'e opsiyonel, PII olmayan
+  (opak referans) yeni bir alan eklendi. `StripeConnector`, mock payload'ın `data.object.customer`
+  alanını çıkarır; boş string de "yok" sayılır (provider'ın hiç göndermediği durumla aynı, tekil
+  müşteri sayısını yanlışlıkla şişirmemesi için). Genel ingestion endpoint'i (`EventsController`)
+  için de opsiyonel `customerRef` alanı eklendi.
+- **Business-impact özeti** — Incident Detail sayfasında ve `GET /api/v1/incidents/{id}`
+  yanıtında yeni bir "İş Etkisi" bölümü: etkilenen istek sayısı, tekil etkilenen müşteri sayısı
+  (provider bu veriyi taşımıyorsa dürüst bir "bilinmiyor" mesajı — 0 ile "veri yok" birbirinden
+  ayrılır) ve okunabilir süre.
+- **Eşzamanlılık bulgusu (gerçek Docker Compose'da bulundu):** Müşteri sayısı ilk denemede yanlış
+  çıktı (2 yerine 4) — sebebi, `Incident.FirstSeen`'in her zaman kronolojik olarak en erken event
+  olmaması (paralel Hangfire worker'ları aynı fingerprint için yarışırken, incident'ı "açan" event
+  yarışı kazanan event'tir, en erken gönderilen değil — bkz. M15'teki eşzamanlılık notu).
+  Sorgunun alt zaman sınırına 15 dakikalık bir güvenlik payı eklenerek düzeltildi ve gerçek
+  Docker Compose ortamında (6 event / 4 müşteri senaryosu ve rate-limit/outage senaryolarının
+  "bilinmiyor" göstermesi) sıfırdan doğrulandı.
+- Migration (`AddAffectedCustomerRef`) fresh bir veritabanına karşı (`docker compose down -v` +
+  `up --build`) uçtan uca doğrulandı.
 
-- **M18 — Incident Intelligence:** Affected-customer alanı (connector'ların `NormalizedEvent`'e
-  müşteri kimliği eklemesi gerekir, şema değişikliği), business-impact özet endpoint'i.
+## Sonraki Adımlar (Post-M18)
+
+14 günlük planın çekirdek zinciri, CTO review'ün Faz 1 (Product Proof), Faz 2 (Production
+Readiness) ve Faz 3'ün (Incident Intelligence) ilk kalemi tamamlandı (bkz.
+`docs/CTO_REVIEW_ANALYSIS.md`). Kalan iş:
+
 - **M19 — Customer Validation:** Gerçek kullanıcılarla (entegrasyon geliştiricisi, support
   mühendisi, otomasyon danışmanı) M17 demo'sunu doğrulamak — "Bugün aynı problemi çözmek için
   hangi ekranlara bakıyorsunuz?"

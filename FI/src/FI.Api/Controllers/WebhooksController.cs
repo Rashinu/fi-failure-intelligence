@@ -67,7 +67,8 @@ public class WebhooksController : ControllerBase
             isSignatureVerified: isSignatureVerified,
             payloadSizeBytes: Encoding.UTF8.GetByteCount(payload.RawBody),
             isTruncated: false,
-            occurredAt: normalized.OccurredAt);
+            occurredAt: normalized.OccurredAt,
+            affectedCustomerRef: normalized.AffectedCustomerRef);
 
         if (normalized.ProviderEventId is not null)
         {

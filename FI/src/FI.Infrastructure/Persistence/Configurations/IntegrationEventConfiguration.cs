@@ -29,6 +29,7 @@ public class IntegrationEventConfiguration : IEntityTypeConfiguration<Integratio
         builder.Property(e => e.IsTruncated).HasColumnName("is_truncated").IsRequired();
         builder.Property(e => e.OccurredAt).HasColumnName("occurred_at").IsRequired();
         builder.Property(e => e.ReceivedAt).HasColumnName("received_at").IsRequired();
+        builder.Property(e => e.AffectedCustomerRef).HasColumnName("affected_customer_ref").HasMaxLength(200);
 
         builder.HasIndex(e => new { e.IntegrationId, e.OccurredAt });
         builder.HasIndex(e => e.CorrelationId);

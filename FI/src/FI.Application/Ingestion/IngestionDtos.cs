@@ -7,7 +7,8 @@ public sealed record IngestEventRequest(
     object? Request,
     object? Response,
     int? Latency,
-    DateTimeOffset OccurredAt);
+    DateTimeOffset OccurredAt,
+    string? CustomerRef = null);
 
 public sealed record IngestEventResponse(Guid EventId, Guid CorrelationId);
 

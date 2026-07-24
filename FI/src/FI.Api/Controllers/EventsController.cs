@@ -93,7 +93,8 @@ public class EventsController : ControllerBase
             isSignatureVerified: null,
             payloadSizeBytes: totalBytes,
             isTruncated: isTruncated,
-            occurredAt: request.OccurredAt);
+            occurredAt: request.OccurredAt,
+            affectedCustomerRef: request.CustomerRef);
 
         _db.IntegrationEvents.Add(integrationEvent);
 

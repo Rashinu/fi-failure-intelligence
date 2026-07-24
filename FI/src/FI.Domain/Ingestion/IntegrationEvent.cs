@@ -30,6 +30,14 @@ public class IntegrationEvent
     public DateTimeOffset OccurredAt { get; private set; }
     public DateTimeOffset ReceivedAt { get; private set; }
 
+    /// <summary>
+    /// Bkz. docs/CTO_REVIEW_ANALYSIS.md M18 (Incident Intelligence) — "kaç müşteri etkilendi"
+    /// sorusuna cevap verebilmek için, provider'ın kendi müşteri/kullanıcı kimliği (ör. Stripe
+    /// customer id). Opsiyoneldir — her provider/event bunu taşımaz; PII değildir (opak bir
+    /// referans kimliği, ad/e-posta değil), bu yüzden Bölüm 33.3 redaction'ının kapsamı dışındadır.
+    /// </summary>
+    public string? AffectedCustomerRef { get; private set; }
+
     private IntegrationEvent() { }
 
     public static IntegrationEvent Create(
@@ -45,7 +53,8 @@ public class IntegrationEvent
         bool? isSignatureVerified,
         int payloadSizeBytes,
         bool isTruncated,
-        DateTimeOffset occurredAt)
+        DateTimeOffset occurredAt,
+        string? affectedCustomerRef = null)
     {
         if (statusCode is < 100 or > 599)
             throw new ArgumentOutOfRangeException(nameof(statusCode), "statusCode 100-599 aralığında olmalıdır.");
@@ -66,7 +75,8 @@ public class IntegrationEvent
             PayloadSizeBytes = payloadSizeBytes,
             IsTruncated = isTruncated,
             OccurredAt = occurredAt,
-            ReceivedAt = DateTimeOffset.UtcNow
+            ReceivedAt = DateTimeOffset.UtcNow,
+            AffectedCustomerRef = affectedCustomerRef
         };
     }
 

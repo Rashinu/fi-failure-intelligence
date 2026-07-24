@@ -49,5 +49,6 @@ public sealed record IncidentDetailResponse(
     int ReopenCount,
     string Fingerprint,
     string SuggestedAction,
+    int? AffectedCustomerCount,
     IReadOnlyList<IncidentEvidenceResponse> Evidence,
     AiAnalysisResponse? LatestAnalysis);

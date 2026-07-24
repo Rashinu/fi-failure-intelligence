@@ -96,6 +96,39 @@ public class StripeConnectorTests
     }
 
     [Fact]
+    public void Normalize_WithCustomerField_ExtractsAffectedCustomerRef()
+    {
+        var body = """{"type":"charge.failed","httpStatusCode":401,"data":{"object":{"id":"ch_123","customer":"cus_demo_a"}}}""";
+        var payload = new RawInboundPayload(body, new Dictionary<string, string>());
+
+        var normalized = _connector.Normalize(payload, isSignatureVerified: true);
+
+        normalized.AffectedCustomerRef.Should().Be("cus_demo_a");
+    }
+
+    [Fact]
+    public void Normalize_WithoutCustomerField_AffectedCustomerRefIsNull()
+    {
+        var body = """{"type":"charge.failed","httpStatusCode":401,"data":{"object":{"id":"ch_123"}}}""";
+        var payload = new RawInboundPayload(body, new Dictionary<string, string>());
+
+        var normalized = _connector.Normalize(payload, isSignatureVerified: true);
+
+        normalized.AffectedCustomerRef.Should().BeNull();
+    }
+
+    [Fact]
+    public void Normalize_WithEmptyCustomerField_AffectedCustomerRefIsNull()
+    {
+        var body = """{"type":"charge.failed","httpStatusCode":401,"data":{"object":{"id":"ch_123","customer":""}}}""";
+        var payload = new RawInboundPayload(body, new Dictionary<string, string>());
+
+        var normalized = _connector.Normalize(payload, isSignatureVerified: true);
+
+        normalized.AffectedCustomerRef.Should().BeNull();
+    }
+
+    [Fact]
     public void Redact_MasksClientSecretAndApiKeyFields()
     {
         var node = JsonDocument.Parse("""{"client_secret":"sk_live_abc","nested":{"api_key":"key_123","keep":"visible"}}""").RootElement;

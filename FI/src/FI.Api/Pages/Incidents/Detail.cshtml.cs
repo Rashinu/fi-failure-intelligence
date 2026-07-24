@@ -28,6 +28,7 @@ public class DetailModel : PageModel
     public int ReopenCount { get; private set; }
     public string Fingerprint { get; private set; } = "";
     public string SuggestedAction { get; private set; } = "";
+    public int? AffectedCustomerCount { get; private set; }
     public List<EvidenceRow> Evidence { get; private set; } = new();
     public AiAnalysisRow? LatestAnalysis { get; private set; }
     public List<TimelineEntry> Timeline { get; private set; } = new();
@@ -48,6 +49,18 @@ public class DetailModel : PageModel
             .Where(a => a.IncidentId == id && a.IsLatest)
             .FirstOrDefaultAsync(cancellationToken);
 
+        // Bkz. IncidentsController.GetById - ayni "FirstSeen guvenlik payi" mantigi burada da
+        // kullanilir (paralel ClassifyJob'larin FirstSeen'i kronolojik ilk event'e sabitlememesi).
+        var windowStart = incident.FirstSeen - TimeSpan.FromMinutes(15);
+        var distinctCustomerRefs = await _db.IntegrationEvents.AsNoTracking()
+            .Where(e => e.IntegrationId == incident.IntegrationId
+                        && e.Category == incident.Category.ToString()
+                        && e.OccurredAt >= windowStart && e.OccurredAt <= incident.LastSeen
+                        && e.AffectedCustomerRef != null)
+            .Select(e => e.AffectedCustomerRef)
+            .Distinct()
+            .CountAsync(cancellationToken);
+
         Found = true;
         Id = incident.Id;
         IntegrationName = integration?.Name ?? "unknown";
@@ -60,6 +73,7 @@ public class DetailModel : PageModel
         ReopenCount = incident.ReopenCount;
         Fingerprint = incident.Fingerprint;
         SuggestedAction = SuggestedActionCatalog.For(incident.Category);
+        AffectedCustomerCount = distinctCustomerRefs > 0 ? distinctCustomerRefs : null;
 
         Evidence = evidence.Select(e => new EvidenceRow(e.SourceType.ToString(), e.Summary, e.CollectedAt)).ToList();
 

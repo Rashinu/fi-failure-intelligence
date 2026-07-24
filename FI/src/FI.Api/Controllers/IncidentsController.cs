@@ -85,6 +85,29 @@ public class IncidentsController : ControllerBase
             .Where(a => a.IncidentId == id && a.IsLatest)
             .FirstOrDefaultAsync(cancellationToken);
 
+        // Bkz. docs/CTO_REVIEW_ANALYSIS.md M18 - "kac musteri etkilendi". Incident'in kendi
+        // event'lerine dogrudan bir FK yok (fingerprint uzerinden gruplaniyor); ClassifyJobHandler'in
+        // severity hesabinda kullandigi ayni kategori+entegrasyon+zaman-penceresi mantigi burada da
+        // kullanilir. Hicbir event customer ref tasimiyorsa (provider desteklemiyorsa) null donulur -
+        // "0 musteri" ile "bu veri hic yok" birbirinden ayirt edilir.
+        //
+        // FirstSeen alt sinir icin bir guvenlik payi ile genisletilir: paralel Hangfire worker'lari
+        // ayni fingerprint icin coklu ClassifyJob calistirabildiginden (bkz. ClassifyJobHandler'in
+        // basindaki eszamanlilik notu), incident'i "acan" event kronolojik olarak ilk event olmak
+        // zorunda degildir - sadece insert yarisini kazanan event'tir. Bu yuzden FirstSeen bazen
+        // ayni patlamadaki daha erken event'lerden sonra gelebilir; pay olmadan bu erken event'lerin
+        // customer ref'leri sessizce sayima girmez.
+        var windowStart = incident.FirstSeen - TimeSpan.FromMinutes(15);
+        var distinctCustomerRefs = await _db.IntegrationEvents.AsNoTracking()
+            .Where(e => e.IntegrationId == incident.IntegrationId
+                        && e.Category == incident.Category.ToString()
+                        && e.OccurredAt >= windowStart && e.OccurredAt <= incident.LastSeen
+                        && e.AffectedCustomerRef != null)
+            .Select(e => e.AffectedCustomerRef)
+            .Distinct()
+            .CountAsync(cancellationToken);
+        int? affectedCustomerCount = distinctCustomerRefs > 0 ? distinctCustomerRefs : null;
+
         AiAnalysisResponse? latestAnalysis = latestAnalysisEntity is null ? null : new AiAnalysisResponse(
             latestAnalysisEntity.Id,
             latestAnalysisEntity.IncidentTitle,
@@ -109,6 +132,7 @@ public class IncidentsController : ControllerBase
             incident.ReopenCount,
             incident.Fingerprint,
             SuggestedActionCatalog.For(incident.Category),
+            affectedCustomerCount,
             evidence,
             latestAnalysis));
     }

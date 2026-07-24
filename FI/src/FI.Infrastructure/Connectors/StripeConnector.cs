@@ -13,8 +13,9 @@ namespace FI.Infrastructure.Connectors;
 /// Gerçek Stripe SDK'sı kullanılmaz; bu, demo/pilot senaryosu için Stripe'ın webhook zarfını
 /// ve imza şemasını (Stripe-Signature: t=...,v1=...) taklit eden bir mock'tur.
 /// Beklenen ham gövde şekli: { "type": "charge.failed", "httpStatusCode": 401,
-///   "data": { "object": { "id": "ch_123", "status": "failed" } },
+///   "data": { "object": { "id": "ch_123", "status": "failed", "customer": "cus_123" } },
 ///   "error": { "code": "invalid_api_key" } }
+/// "customer" alanı opsiyoneldir - Bkz. docs/CTO_REVIEW_ANALYSIS.md M18 ("kaç müşteri etkilendi").
 /// </summary>
 public sealed class StripeConnector : IIntegrationConnector
 {
@@ -39,6 +40,16 @@ public sealed class StripeConnector : IIntegrationConnector
             ? codeEl.GetString()
             : null;
 
+        string? affectedCustomerRef = null;
+        if (root.TryGetProperty("data", out var dataForCustomer) &&
+            dataForCustomer.TryGetProperty("object", out var objForCustomer) &&
+            objForCustomer.TryGetProperty("customer", out var customerEl) &&
+            customerEl.ValueKind == JsonValueKind.String &&
+            !string.IsNullOrWhiteSpace(customerEl.GetString()))
+        {
+            affectedCustomerRef = customerEl.GetString();
+        }
+
         var requestJson = JsonSerializer.Serialize(new
         {
             provider = ProviderKey,
@@ -61,7 +72,8 @@ public sealed class StripeConnector : IIntegrationConnector
             ResponseJson: responseJson,
             LatencyMs: null,
             OccurredAt: DateTimeOffset.UtcNow,
-            ProviderEventId: providerEventId);
+            ProviderEventId: providerEventId,
+            AffectedCustomerRef: affectedCustomerRef);
     }
 
     /// <summary>

@@ -16,4 +16,5 @@ public sealed record NormalizedEvent(
     string? ResponseJson,
     int? LatencyMs,
     DateTimeOffset OccurredAt,
-    string? ProviderEventId);
+    string? ProviderEventId,
+    string? AffectedCustomerRef = null);

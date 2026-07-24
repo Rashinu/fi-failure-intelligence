@@ -5,6 +5,7 @@ using FI.Application.Integrations;
 using FI.Domain.Audit;
 using FI.Domain.Ingestion;
 using FI.Infrastructure.Persistence;
+using FI.Infrastructure.Security;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,11 +17,13 @@ public class IntegrationsController : ControllerBase
 {
     private readonly FiDbContext _db;
     private readonly IConfiguration _configuration;
+    private readonly IWebhookSecretProtector _webhookSecretProtector;
 
-    public IntegrationsController(FiDbContext db, IConfiguration configuration)
+    public IntegrationsController(FiDbContext db, IConfiguration configuration, IWebhookSecretProtector webhookSecretProtector)
     {
         _db = db;
         _configuration = configuration;
+        _webhookSecretProtector = webhookSecretProtector;
     }
 
     [HttpPost]
@@ -43,7 +46,7 @@ public class IntegrationsController : ControllerBase
         integration.IssueApiKey(keyPrefix, keyHash);
 
         var webhookSecret = GenerateWebhookSecret();
-        integration.IssueWebhookSecret(webhookSecret);
+        integration.IssueWebhookSecret(_webhookSecretProtector.Protect(webhookSecret));
 
         _db.Integrations.Add(integration);
         await _db.SaveChangesAsync(cancellationToken);
@@ -133,7 +136,7 @@ public class IntegrationsController : ControllerBase
         if (integration is null) return NotFound();
 
         var webhookSecret = GenerateWebhookSecret();
-        integration.IssueWebhookSecret(webhookSecret);
+        integration.IssueWebhookSecret(_webhookSecretProtector.Protect(webhookSecret));
 
         _db.AuditLogs.Add(AuditLog.Create(
             AuditActorType.User, actorId: null, AuditActions.WebhookSecretRotated, AuditEntityTypes.Integration,

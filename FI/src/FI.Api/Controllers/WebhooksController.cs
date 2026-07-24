@@ -4,6 +4,7 @@ using FI.Domain.Connectors;
 using FI.Domain.Ingestion;
 using FI.Domain.Outbox;
 using FI.Infrastructure.Persistence;
+using FI.Infrastructure.Security;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,12 +25,18 @@ public class WebhooksController : ControllerBase
 {
     private readonly FiDbContext _db;
     private readonly IConnectorRegistry _registry;
+    private readonly IWebhookSecretProtector _webhookSecretProtector;
 
-    public WebhooksController(FiDbContext db, IConnectorRegistry registry)
+    public WebhooksController(FiDbContext db, IConnectorRegistry registry, IWebhookSecretProtector webhookSecretProtector)
     {
         _db = db;
         _registry = registry;
+        _webhookSecretProtector = webhookSecretProtector;
     }
+
+    /// <summary>Bkz. Security/WebhookSecretProtector — saklanan değer şifreli, imza doğrulaması ham sırra ihtiyaç duyar.</summary>
+    private string? UnprotectWebhookSecret(string? protectedSecret) =>
+        protectedSecret is null ? null : _webhookSecretProtector.Unprotect(protectedSecret);
 
     [HttpPost("events")]
     public async Task<IActionResult> IngestEvent(string provider, Guid integrationId, CancellationToken cancellationToken)
@@ -42,8 +49,8 @@ public class WebhooksController : ControllerBase
 
         var payload = await ReadRawPayloadAsync(cancellationToken);
 
-        var isSignatureVerified = integration.WebhookSecret is not null &&
-            connector.VerifySignature(payload, integration.WebhookSecret);
+        var webhookSecret = UnprotectWebhookSecret(integration.WebhookSecret);
+        var isSignatureVerified = webhookSecret is not null && connector.VerifySignature(payload, webhookSecret);
 
         var normalized = connector.Normalize(payload, isSignatureVerified);
 
@@ -91,7 +98,8 @@ public class WebhooksController : ControllerBase
 
         var payload = await ReadRawPayloadAsync(cancellationToken);
 
-        if (integration.WebhookSecret is null || !connector.VerifySignature(payload, integration.WebhookSecret))
+        var webhookSecret = UnprotectWebhookSecret(integration.WebhookSecret);
+        if (webhookSecret is null || !connector.VerifySignature(payload, webhookSecret))
             return Unauthorized(new { error = "Webhook imzası doğrulanamadı." });
 
         var normalized = connector.Normalize(payload);

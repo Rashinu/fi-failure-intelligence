@@ -3,15 +3,24 @@ using FI.Domain.Audit;
 using FI.Domain.Incidents;
 using FI.Domain.Ingestion;
 using FI.Domain.Outbox;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace FI.Infrastructure.Persistence;
 
-public class FiDbContext : DbContext
+/// <summary>
+/// <see cref="IDataProtectionKeyContext"/> uygulaması, ASP.NET Core Data Protection anahtarlarının
+/// (webhook secret şifrelemesi için, bkz. WebhookSecretProtector) container restart'ları/birden
+/// fazla replica arasında kalıcı ve paylaşılan olmasını sağlar - varsayılan dosya sistemi tabanlı
+/// key ring, container'lar arası paylaşılmadığı için production'da uygun değildir.
+/// </summary>
+public class FiDbContext : DbContext, IDataProtectionKeyContext
 {
     public FiDbContext(DbContextOptions<FiDbContext> options) : base(options)
     {
     }
+
+    public DbSet<Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey> DataProtectionKeys => Set<Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey>();
 
     public DbSet<Integration> Integrations => Set<Integration>();
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();

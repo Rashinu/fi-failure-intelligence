@@ -50,6 +50,21 @@ public class FiApiFactory : WebApplicationFactory<FI.Api.Program>, IAsyncLifetim
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
+
+        // Bkz. Faz 2 "Production Readiness" karari: migration'lar artik uygulama baslangicinda
+        // otomatik uygulanmiyor (bkz. Program.cs "--migrate" modu). Testler icin burada, gercek
+        // deploy pipeline'indaki ayri migration adimini taklit ederek acikca cagirilir.
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<FiDbContext>();
+        await db.Database.MigrateAsync();
+
+        if (!db.PromptVersions.Any(p => p.Status == FI.Domain.AiAnalysis.PromptVersionStatus.Active))
+        {
+            db.PromptVersions.Add(FI.Domain.AiAnalysis.PromptVersion.CreateActive(
+                FI.Infrastructure.Ai.PromptTemplates.RootCauseV1Label,
+                FI.Infrastructure.Ai.PromptTemplates.RootCauseV1SystemPrompt));
+            await db.SaveChangesAsync();
+        }
     }
 
     public new async Task DisposeAsync()

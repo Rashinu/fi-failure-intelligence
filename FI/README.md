@@ -387,27 +387,58 @@ yakalayamayacağı türden bir sınıf — gerçek eşzamanlı üretim trafiği 
 çıkmıyordu. Bu, "iyi test edilmiş" ile "üretim trafiğinde doğrulanmış" arasındaki farkı somut
 şekilde gösteriyor.
 
-## Sonraki Adımlar (Post-M15)
+**M16 — Production Readiness (Faz 2) tamamlandı.** CTO review'ün Faz 2 kalemlerinin tamamı,
+gerçek bir Docker Compose ortamında (bir dış CI değil) uçtan uca doğrulanarak tamamlandı:
 
-14 günlük planın çekirdek zinciri (event → classify → fingerprint → incident → evidence →
-AI analiz → observability) artık uçtan uca çalışıyor; mock connector'lar (Bölüm 34-37), golden
-dataset/eval harness (Bölüm 26.4), PII/secret redaction pipeline'ı (Bölüm 33.3), evidence
-collector'ın 4 kaynağının tamamı (Bölüm 23), prompt version A/B/regresyon gate'i (Bölüm 26.3),
-CI/CD pipeline'ı (Bölüm 39), API key rotasyon grace period'u (Bölüm 33.4) buna bağlandı; golden
-dataset gerçek Claude Haiku'ya karşı da çalıştırıldı (M14). Kalan, kasıtlı olarak ertelenmiş işler:
-- **`fi-root-cause-v1` prompt'unun (veya grounding kontrolünün) iyileştirilmesi** — M14'te ölçülen
-  gerçek skor (0.726) eşiği geçmiyor; en zayıf halkalar Grounding (0.100) ve
-  NeedsHumanReviewAccuracy (0.250). Yeni bir `DRAFT` prompt versiyonu oluşturup
-  `POST /api/v1/prompt-versions/{id}/promote` ile (gerçek `IAiAnalysisClient`'a bağlandıktan
-  sonra) tekrar denenebilir.
-- GitHub'da branch protection kuralının Build/Test/Migration Check'i zorunlu status check yapması
-  (workflow dosyası hazır, repo ayarı henüz yapılmadı)
-- Docker image'ının gerçek bir container registry'ye (ör. GHCR) push edilmesi
-- Canlı analiz sağlık metriklerine (son N=200) dayalı ek promotion koşulu (Bölüm 26.3)
-- Seq/OTLP collector entegrasyonu (şu an yalnızca konsol exporter)
+- **`Program.cs` bölündü** — servis kayıtları `FI.Api/Extensions/` altında 5 extension method'a
+  ayrıldı (`AddFiPersistence`, `AddFiBackgroundJobs`, `AddFiConnectors`, `AddFiAiAnalysis`,
+  `AddFiObservability`); `Program.cs` artık yalnızca bu method'ları çağıran bir composition root.
+- **AI Resilience** — `AnthropicMessagesClient` artık .NET 8'in standart resilience handler'ı
+  (Polly v8 tabanlı, `Microsoft.Extensions.Http.Resilience`) ile sarmalı: retry (üstel geri
+  çekilme + jitter, `Retry-After` header'ını otomatik dikkate alır), circuit breaker, deneme
+  başına + toplam timeout. Önceden yalnızca çıplak `HttpClient.Timeout` vardı.
+- **Webhook secret artık düz metin değil** — `Integration.WebhookSecret`, ASP.NET Core Data
+  Protection ile şifrelenmiş olarak saklanıyor (`WebhookSecretProtector`); anahtar halkası
+  `FiDbContext` üzerinden kalıcı (container restart/çoklu replica arasında paylaşılır, bkz.
+  `DataProtectionKeys` tablosu). Gerçek container'da doğrulandı: DB'deki değer artık
+  `CfDJ8...` formatında (Data Protection ciphertext), API yanıtında hâlâ ham secret dönüyor
+  (caller'ın webhook'unu imzalaması için gerekli) ve imza doğrulaması uçtan uca çalışıyor.
+- **Migration artık startup'ta değil, deploy-time'da** — `Program.cs` artık başlangıçta otomatik
+  migration uygulamıyor (çoklu replica'da race condition riski taşıdığı için). Bunun yerine aynı
+  image, `--migrate` argümanıyla yalnızca migration+seed yapıp çıkan ayrı bir "migrator" modu
+  kazandı; `docker-compose.yml`'e bu modu çalıştıran tek seferlik bir `fi-migrate` servisi
+  eklendi, `fi-app` yalnızca bu başarıyla bittikten sonra başlıyor
+  (`depends_on: condition: service_completed_successfully`) — gerçek Docker Compose'ta
+  doğrulandı.
+- **OTLP exporter eklendi** — `Otel:OtlpEndpoint` yapılandırılmışsa (Seq, Grafana Tempo, Jaeger)
+  trace'ler oraya da gönderiliyor; yapılandırılmamışsa (varsayılan, yerel geliştirme) yalnızca
+  konsol exporter kullanılıyor, ek altyapı gerekmiyor.
+- GitHub repo About açıklaması ve topics eklendi (`dotnet`, `postgresql`, `hangfire`,
+  `anthropic`, `incident-management`).
+- Test fixture'ı (`FiApiFactory`) migration artık otomatik olmadığı için güncellendi — testler
+  gerçek deploy pipeline'ındaki ayrı migration adımını taklit ederek migration'ı açıkça çağırıyor.
 
-Bkz. `docs/FAILURE_INTELLIGENCE_ARCHITECTURE.md` Bölüm 43 (Post-MVP Roadmap) ve Bölüm 49
-(Open Decisions).
+## Sonraki Adımlar (Post-M16)
+
+14 günlük planın çekirdek zinciri **ve** CTO review'ün "Faz 2 — Production Readiness" kalemleri
+tamamlandı (bkz. `docs/CTO_REVIEW_ANALYSIS.md`). Motor artık hem işlevsel olarak eksiksiz hem de
+üretim sertliğine sahip. Kalan iş, backend'e yeni özellik eklemek değil:
+
+- **M17 — Product Proof (en yüksek öncelik):** Sistemin ürettiği hiçbir veri şu an görsel olarak
+  gösterilmiyor — yalnızca Swagger/JSON API var. Incident dashboard, incident detail (timeline,
+  evidence kartları, AI summary), demo seed data. Bkz. `docs/CTO_REVIEW_ANALYSIS.md` M16 (orada
+  farklı numaralandırılmış).
+- **M18 — Incident Intelligence:** Deterministik "suggested action" kuralları (401→API key
+  kontrol et vb.), affected-customer alanı, business-impact özet endpoint'i.
+- **M19 — Customer Validation:** Gerçek kullanıcılarla (entegrasyon geliştiricisi, support
+  mühendisi, otomasyon danışmanı) M17 demo'sunu doğrulamak.
+- `fi-root-cause-v1` prompt'unun iyileştirilmesi — M14'te ölçülen skor (0.726) eşiği geçmiyor,
+  en zayıf halkalar Grounding (0.100) ve NeedsHumanReviewAccuracy (0.250).
+- Canlı analiz sağlık metriklerine (son N=200) dayalı ek promotion koşulu (Bölüm 26.3).
+
+Bkz. `docs/CTO_REVIEW_ANALYSIS.md` (güncellenmiş, detaylı öncelik planı) ve
+`docs/FAILURE_INTELLIGENCE_ARCHITECTURE.md` Bölüm 43 (Post-MVP Roadmap) / Bölüm 49 (Open
+Decisions).
 
 ## AI Provider Yapılandırması (Anthropic)
 

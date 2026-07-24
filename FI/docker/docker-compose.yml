@@ -16,14 +16,31 @@ services:
       timeout: 5s
       retries: 10
 
+  # Bkz. Faz 2 "Production Readiness" karari: migration'lar artik fi-app'in kendi baslangicinda
+  # otomatik uygulanmiyor (coklu replica'da race condition riski tasidigi icin - bkz. Program.cs).
+  # Bunun yerine ayni image, "--migrate" argumaniyla yalnizca migration+seed calistirip cikan
+  # tek seferlik bir servis olarak once calisir; fi-app ancak bu basariyla bittikten sonra baslar.
+  fi-migrate:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: fi-migrate
+    depends_on:
+      fi-postgres:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__FiDatabase: "Host=fi-postgres;Port=5432;Database=fi;Username=fi_app;Password=CHANGE_ME_LOCAL_DEV_ONLY"
+      ASPNETCORE_ENVIRONMENT: Development
+    entrypoint: ["dotnet", "FI.Api.dll", "--migrate"]
+
   fi-app:
     build:
       context: ..
       dockerfile: docker/Dockerfile
     container_name: fi-app
     depends_on:
-      fi-postgres:
-        condition: service_healthy
+      fi-migrate:
+        condition: service_completed_successfully
     environment:
       ConnectionStrings__FiDatabase: "Host=fi-postgres;Port=5432;Database=fi;Username=fi_app;Password=CHANGE_ME_LOCAL_DEV_ONLY"
       ASPNETCORE_ENVIRONMENT: Development

@@ -121,6 +121,20 @@ Teknoloji seçimi: ayrı bir frontend projesi (React/Next.js) mi, yoksa Razor Pa
    migration'dan itibaren) doğrulandı; ayrıntı ve bu süreçte bulunup düzeltilen bir eşzamanlılık
    bug'ı için `FI/README.md`'deki M18 notuna bakın.
 
+### Due Diligence Düzeltmeleri (D1, D7/D8) — ✅ TAMAMLANDI
+
+Harici bir due-diligence raporu (statik kod okumasıyla, canlı çalıştırma yapılamadan), bu ortamda
+birebir doğrulanıp düzeltilen iki gerçek bulgu tespit etti:
+
+- **D1** — `ClassifyJobHandler`'daki severity/iş-etkisi pencere sayımları, henüz DB'ye
+  yazılmamış (SaveChangesAsync öncesi) güncel event'i kendi penceresinden dışlıyordu
+  (off-by-one). Bir entegrasyon testiyle canlı doğrulandı ve düzeltildi.
+- **D7/D8** — Control plane'de (`IntegrationsController`, `PromptVersionsController`,
+  `IncidentsController` JSON API, `/Incidents` dashboard, `/hangfire`) hiç authentication yoktu;
+  ayrıca Hangfire'ın kendi varsayılan "yalnızca localhost" filtresi, admin kimlik bilgisiyle bile
+  Docker port-forwarding arkasında güvenilmez şekilde reddediyordu. Minimal bir paylaşılan-sır
+  HTTP Basic Auth kapısı eklendi. Ayrıntı için `FI/README.md`'deki ilgili nota bakın.
+
 ### M19 — Customer Validation
 
 İncelemenin önerdiği doğrudan uygulanabilir: en az 3 entegrasyon geliştiricisi, 2 support

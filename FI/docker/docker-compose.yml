@@ -44,6 +44,11 @@ services:
     environment:
       ConnectionStrings__FiDatabase: "Host=fi-postgres;Port=5432;Database=fi;Username=fi_app;Password=CHANGE_ME_LOCAL_DEV_ONLY"
       ASPNETCORE_ENVIRONMENT: Development
+      # Bkz. docs/CTO_REVIEW_ANALYSIS.md Due Diligence D7 - control-plane (integrations,
+      # prompt-versions, /Incidents, /hangfire) artık admin Basic Auth gerektiriyor
+      # (bkz. AdminBasicAuthMiddleware). Bu, yalnızca yerel demo için bir değer - herhangi bir
+      # paylaşılan/production ortamında MUTLAKA gerçek bir sırla override edilmelidir.
+      Admin__SharedSecret: "local-dev-admin-secret-change-me"
     ports:
       - "8080:8080"
 

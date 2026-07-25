@@ -10,6 +10,10 @@
 set -euo pipefail
 
 BASE_URL="${FI_BASE_URL:-http://localhost:8080}"
+# Bkz. docs/CTO_REVIEW_ANALYSIS.md Due Diligence D7 - integrations CRUD/rotasyon artık admin
+# Basic Auth gerektiriyor (bkz. AdminBasicAuthMiddleware). docker-compose.yml'deki fi-app
+# varsayılanıyla eşleşiyor; gerçek bir dağıtımda FI_ADMIN_SECRET ile override edin.
+ADMIN_SECRET="${FI_ADMIN_SECRET:-local-dev-admin-secret-change-me}"
 
 sign_stripe() {
   local secret="$1" body="$2" ts
@@ -22,6 +26,7 @@ sign_stripe() {
 create_integration() {
   local name="$1" provider="$2" criticality="$3"
   curl -s -X POST "$BASE_URL/api/v1/integrations" \
+    -u "admin:$ADMIN_SECRET" \
     -H "Content-Type: application/json" \
     -d "{\"name\":\"$name\",\"provider\":\"$provider\",\"environment\":\"production\",\"owner\":\"demo\",\"endpointUrl\":\"https://api.$provider.com\",\"businessCriticality\":\"$criticality\"}"
 }
@@ -45,7 +50,7 @@ INTEGRATION_1=$(echo "$OUT1" | grep -o '"integrationId":"[^"]*"' | cut -d'"' -f4
 SECRET_1=$(echo "$OUT1" | grep -o '"webhookSecret":"[^"]*"' | cut -d'"' -f4)
 
 # Rotasyon -> CONFIG_CHANGE evidence kaynagi bunu incident'a otomatik iliskilendirecek.
-curl -s -X POST "$BASE_URL/api/v1/integrations/$INTEGRATION_1/api-key/rotate" > /dev/null
+curl -s -X POST "$BASE_URL/api/v1/integrations/$INTEGRATION_1/api-key/rotate" -u "admin:$ADMIN_SECRET" > /dev/null
 
 for i in 1 2 3 4 5 6; do
   # ilk 3 event ayni musteriye ait - "kac musteri etkilendi" farkli bir sayi (4) gostersin.

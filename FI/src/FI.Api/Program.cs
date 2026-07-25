@@ -87,12 +87,24 @@ app.UseStaticFiles();
 
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<ApiKeyAuthMiddleware>();
+app.UseMiddleware<AdminBasicAuthMiddleware>();
 
 app.UseAuthorization();
 app.MapControllers();
 app.MapRazorPages();
 
-app.UseHangfireDashboard("/hangfire");
+// Bkz. docs/CTO_REVIEW_ANALYSIS.md Due Diligence D7/D8: AdminBasicAuthMiddleware yukarıda
+// "/hangfire" için zaten tam bir kimlik doğrulama kapısı uyguluyor. Hangfire'ın kendi varsayılan
+// filtresi (LocalRequestsOnlyAuthorizationFilter) bunun ÜSTÜNE ikinci, bağımsız bir kontrol daha
+// ekliyor - ve bu kontrol, "isteğin gerçekten localhost'tan geldiği" varsayımına dayanıyor, ki bu
+// bir reverse proxy'nin veya Docker port-forwarding'in arkasında güvenilir değil (canlı doğrulandı:
+// admin kimlik bilgisiyle bile Docker Compose port-forwarding üzerinden 401 döndü). Erişimi tek,
+// tutarlı bir kapıda (AdminBasicAuthMiddleware) toplamak için Hangfire'ın kendi filtresini burada
+// devre dışı bırakıyoruz - bu route zaten hiçbir zaman middleware'i atlayarak buraya ulaşmıyor.
+app.UseHangfireDashboard("/hangfire", new DashboardOptions
+{
+    Authorization = new[] { new AlwaysAllowDashboardAuthorizationFilter() }
+});
 
 app.MapFiRecurringJobs();
 

@@ -460,6 +460,31 @@ sorusuna cevap veren business-impact özeti.
 - Migration (`AddAffectedCustomerRef`) fresh bir veritabanına karşı (`docker compose down -v` +
   `up --build`) uçtan uca doğrulandı.
 
+**Due Diligence düzeltmeleri (D1, D7/D8) tamamlandı.** Harici bir due-diligence raporu, statik
+kod okumasıyla (canlı çalıştırma yapılamadan) iki gerçek bulgu tespit etti; ikisi de bu ortamda
+doğrulanıp düzeltildi:
+
+- **D1 — Severity/iş-etkisi pencereleri güncel event'i dışlıyordu:** `ClassifyJobHandler`,
+  `count10/15/30` sorgularını `evt.SetCategory(...)` yalnızca bellekte set edildikten ve
+  `SaveChangesAsync`'ten ÖNCE çalıştırıyordu — yani sınıflandırılan event, DB'de hâlâ eski
+  kategoriyle durduğundan kendi penceresinden dışlanıyordu (off-by-one). Yazılan bir entegrasyon
+  testiyle canlı doğrulandı (5 `RateLimitError` event'i sonrası severity yanlışlıkla Low kalıyordu,
+  Medium eşiği ≥5 iken). Düzeltme: güncel event, düştüğü her pencereye elle +1 ekleniyor artık.
+- **D7/D8 — Control plane'de hiç authentication yoktu:** `IntegrationsController`,
+  `PromptVersionsController`, `IncidentsController` (JSON API), `/Incidents` (Razor dashboard) ve
+  `/hangfire` — hiçbiri kimlik doğrulaması gerektirmiyordu; ağ erişimi olan HERKES ham bir webhook
+  secret'ı kendine rotate edebilir, tüm incident verisini görebilirdi. Minimal bir paylaşılan-sır
+  HTTP Basic Auth kapısı (`AdminBasicAuthMiddleware`) eklendi. Düzeltme sırasında ayrı bir bulgu
+  daha çıktı: Hangfire'ın kendi varsayılan "yalnızca localhost" filtresi, admin kimlik bilgisiyle
+  bile Docker Compose port-forwarding üzerinden 401 döndürüyordu (D8) — bu filtre kaldırılıp
+  erişim tek başına admin kapısına bağlandı. Tüm değişiklikler gerçek Docker Compose'da (kimliksiz
+  401, doğru/yanlış kimlikle 200/401) ve 8 yeni `ControlPlaneAuthTests` testiyle doğrulandı.
+  Ingestion endpoint'leri (`/api/v1/events`, `/api/v1/webhooks`, `/api/v1/deployments`) bu kapsamın
+  dışında — zaten ayrı, machine-to-machine `ApiKeyAuthMiddleware` ile korunuyor.
+
+Yerel demo için varsayılan sır `local-dev-admin-secret-change-me` (`docker-compose.yml`,
+`Admin__SharedSecret`) — **herhangi bir paylaşılan/production ortamında değiştirilmelidir.**
+
 ## Sonraki Adımlar (Post-M18)
 
 14 günlük planın çekirdek zinciri, CTO review'ün Faz 1 (Product Proof), Faz 2 (Production

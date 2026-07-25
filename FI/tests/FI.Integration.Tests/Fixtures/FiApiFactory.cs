@@ -1,3 +1,6 @@
+using System.Net.Http.Headers;
+using System.Text;
+using FI.Api.Middleware;
 using FI.Domain.AiAnalysis;
 using FI.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
@@ -71,4 +74,23 @@ public class FiApiFactory : WebApplicationFactory<FI.Api.Program>, IAsyncLifetim
     {
         await _postgres.StopAsync();
     }
+
+    /// <summary>
+    /// Bkz. AdminBasicAuthMiddleware (D7 düzeltmesi) - control-plane rotaları (integrations,
+    /// prompt-versions, /Incidents, /hangfire) artık admin Basic Auth gerektiriyor. Testlerin
+    /// çoğunluğu bu davranışı doğrudan test etmediği için, `CreateClient()` her zaman geçerli
+    /// kimlik bilgisiyle döner - auth'un kendisini test eden testler (bkz. ControlPlaneAuthTests)
+    /// bunun yerine `CreateUnauthenticatedClient()` kullanır.
+    /// </summary>
+    public new HttpClient CreateClient()
+    {
+        var client = base.CreateClient();
+        var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"admin:{AdminBasicAuthMiddleware.LocalDevDefault}"));
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+        return client;
+    }
+
+    /// <summary>Admin Basic Auth header'ı olmayan çıplak bir client - yalnızca auth kapısının
+    /// kendisini test eden testler için (bkz. ControlPlaneAuthTests).</summary>
+    public HttpClient CreateUnauthenticatedClient() => base.CreateClient();
 }

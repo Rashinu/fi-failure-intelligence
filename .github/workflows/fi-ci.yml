@@ -85,6 +85,7 @@ jobs:
             "Ingestion.EventIngestionTests"
             "Integrations.IntegrationCrudTests"
             "Integrations.IntegrationRotationTests"
+            "Security.ControlPlaneAuthTests"
           )
           for cls in "${classes[@]}"; do
             echo "::group::$cls"

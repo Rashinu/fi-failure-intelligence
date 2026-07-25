@@ -94,10 +94,19 @@ public class ClassifyJobHandler
         var since15Min = now.AddMinutes(-15);
         var since30Min = now.AddMinutes(-30);
 
+        // Bkz. docs/CTO_REVIEW_ANALYSIS.md - Due Diligence D1: evt.SetCategory(...) yukarıda
+        // yalnızca bellekte set edildi, SaveChangesAsync henüz çağrılmadı - yani şu an
+        // sınıflandırılan event, DB'de hâlâ eski (null) category ile duruyor ve aşağıdaki
+        // count sorgularından kendi kendini dışlıyordu (off-by-one). Güncel event'i, düştüğü
+        // her pencereye elle +1 ekleyerek dahil ediyoruz.
         var recentEventsQuery = _db.IntegrationEvents.Where(e => e.IntegrationId == evt.IntegrationId && e.Category == result.Category.ToString());
         var count10 = await recentEventsQuery.CountAsync(e => e.OccurredAt >= since10Min, cancellationToken);
         var count15 = await recentEventsQuery.CountAsync(e => e.OccurredAt >= since15Min, cancellationToken);
         var count30 = await recentEventsQuery.CountAsync(e => e.OccurredAt >= since30Min, cancellationToken);
+
+        if (evt.OccurredAt >= since10Min) count10++;
+        if (evt.OccurredAt >= since15Min) count15++;
+        if (evt.OccurredAt >= since30Min) count30++;
 
         var severity = SeverityCalculator.Calculate(
             result.Category, count10, count15, count30,

@@ -138,6 +138,38 @@ public class ClassificationToIncidentTests : IClassFixture<FiApiFactory>
         evt.Category.Should().Be("ProviderError");
     }
 
+    /// <summary>
+    /// DueDiligence D1 regresyon testi: ClassifyJobHandler'daki count10/15/30 sorguları,
+    /// evt.SetCategory(...) sadece bellekte set edildikten ve SaveChangesAsync'ten ÖNCE
+    /// çalıştığından, şu an sınıflandırılan event DB'de hâlâ eski (null) category ile duruyor
+    /// ve sorgudan kendi kendini dışlıyordu (off-by-one). Düzeltme, güncel event'i düştüğü her
+    /// pencereye elle +1 ekliyor. Severity Medium eşiği (30dk'da >=5) RateLimitError için
+    /// Critical/High-eligible olmadığından temiz bir gözlem noktası: düzeltmeden önce bu test
+    /// "Low" (count30=4) buluyordu, düzeltmeden sonra doğru şekilde "Medium" (count30=5) buluyor.
+    /// </summary>
+    [Fact]
+    public async Task FifthRateLimitEventInWindow_ReachesMediumSeverity_IncludingTriggeringEventItself()
+    {
+        var client = _factory.CreateClient();
+        var (integrationId, apiKey) = await CreateIntegrationAsync(client);
+        client.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
+
+        Guid lastEventId = Guid.Empty;
+        for (var i = 0; i < 5; i++)
+        {
+            lastEventId = await IngestEventAsync(client, apiKey, integrationId, 429);
+            await RunClassifyAsync(lastEventId, Guid.NewGuid());
+        }
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<FiDbContext>();
+        var incident = await db.Incidents.FirstAsync(i => i.IntegrationId == integrationId);
+
+        incident.EventCount.Should().Be(5, "EventCount tüm 5 event'i doğru sayıyor (bu alan RecordNewEvent ile artırılıyor, count sorgusuyla değil)");
+        incident.Severity.ToString().Should().Be("Medium",
+            "D1 düzeltmesi: severity hesaplaması artık henüz DB'ye yazılmamış (SaveChanges öncesi) 5. event'i de sayıyor, count30=5 ile Medium eşiği (>=5) doğru tetikleniyor");
+    }
+
     [Fact]
     public async Task IngestedEvent_AlwaysWritesOutboxMessageInSameTransaction()
     {

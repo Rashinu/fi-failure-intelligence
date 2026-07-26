@@ -143,6 +143,10 @@ birebir doğrulanıp düzeltilen iki gerçek bulgu tespit etti:
   bulunmadı — son denemedeki bir concurrency conflict, exception filter koşulu (`attempt <
   MaxConcurrencyRetries`) false olduğundan zaten yakalanmadan yukarı fırlatılıyor. Ayrıntı için
   `FI/README.md`'deki ilgili nota bakın.
+- **D9** — Hiçbir yerde rate limiting yoktu; D7 ile control plane authentication gerektirse bile,
+  geçerli bir API key/admin kimlik bilgisiyle hacimli istek atan biri DB'yi veya faturalandırılan
+  Anthropic API çağrılarını kontrolsüz tüketebilirdi. `/api/v1/*` için IP başına sabit-pencere
+  rate limiti eklendi, gerçek Docker Compose'da canlı doğrulandı.
 
 ### M19 — Customer Validation
 

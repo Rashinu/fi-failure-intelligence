@@ -41,6 +41,7 @@ builder.Services.AddFiBackgroundJobs();
 builder.Services.AddFiConnectors();
 builder.Services.AddFiAiAnalysis(builder.Configuration);
 builder.Services.AddFiObservability(builder.Configuration);
+builder.Services.AddFiRateLimiting();
 
 // Bkz. Bölüm 33.4 - webhook secret'lar düz metin değil, Data Protection ile şifrelenir; anahtar
 // halkası FiDbContext'te kalıcı tutulur (container restart/çoklu replica arasında paylaşılır).
@@ -86,6 +87,7 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseRateLimiter();
 app.UseMiddleware<ApiKeyAuthMiddleware>();
 app.UseMiddleware<AdminBasicAuthMiddleware>();
 

@@ -504,6 +504,15 @@ bloğu hiç eşleşmez ve exception olduğu gibi yukarı (Hangfire'a) fırlatıl
 yakalanmamış bir `throw` ile sonlanıyor. Bu yüzden D5 için herhangi bir kod değişikliği
 yapılmadı.
 
+**D9 (rate limiting) düzeltildi.** Kod tabanının hiçbir yerinde rate limiting yoktu — D7 ile
+control plane authentication gerektirse bile, geçerli bir API key veya admin kimlik bilgisiyle
+hacimli istek atan biri DB'yi veya (evidence varsa) faturalandırılan Anthropic API çağrılarını
+kontrolsüz tüketebilirdi. `Microsoft.AspNetCore.RateLimiting` ile yalnızca `/api/v1/*` altındaki
+rotalar için IP başına sabit-pencere limiti eklendi (`RateLimitingExtensions.AddFiRateLimiting`,
+100 istek / 10 saniye, aşımda 429). Razor dashboard, Hangfire, health check'ler kapsam dışı.
+Gerçek Docker Compose'da canlı doğrulandı: 101. istek 429 döndü, pencere 10 saniye sonra
+sıfırlandı, `/health/live` hiç etkilenmedi. 2 yeni test eklendi.
+
 ## Sonraki Adımlar (Post-M18)
 
 14 günlük planın çekirdek zinciri, CTO review'ün Faz 1 (Product Proof), Faz 2 (Production

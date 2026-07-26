@@ -147,6 +147,13 @@ birebir doğrulanıp düzeltilen iki gerçek bulgu tespit etti:
   geçerli bir API key/admin kimlik bilgisiyle hacimli istek atan biri DB'yi veya faturalandırılan
   Anthropic API çağrılarını kontrolsüz tüketebilirdi. `/api/v1/*` için IP başına sabit-pencere
   rate limiti eklendi, gerçek Docker Compose'da canlı doğrulandı.
+- **PB6 — UI'da tekrarlama (reopen) görünürlüğü.** `Incident.ReopenCount>0` daha önce yalnızca
+  header'da ham bir sayaç olarak ("· N kez reopen") gösteriliyordu; `StatusBadgeClass`'ın hem
+  Detail hem Index sayfasındaki switch'inde `"Reopened"` için ayrı bir case de yoktu (nötr gri
+  rozet gösteriyordu, Open ile görsel olarak ayırt edilemiyordu). Artık ayrı, amber renkli bir
+  "Reopened" rozeti ve Detail sayfasında "bu ilk kez görülen yeni bir olay değil" diyen açık bir
+  banner var. Gerçek Docker Compose'da (DB'de manuel reopen_count/status güncellemesiyle) canlı
+  doğrulandı.
 
 ### M19 — Customer Validation
 

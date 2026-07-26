@@ -104,6 +104,17 @@ a:hover { text-decoration: underline; }
 .fi-badge-neutral { background: rgba(139,147,171,0.16); color: var(--fi-text-muted); }
 .fi-badge-review { background: rgba(239,91,91,0.16); color: var(--fi-critical); }
 .fi-badge-analyzed { background: rgba(110,231,183,0.16); color: var(--fi-low); }
+.fi-badge-reopened { background: rgba(239,200,91,0.16); color: var(--fi-medium); }
+
+.fi-reopen-banner {
+    background: rgba(239,200,91,0.10);
+    border: 1px solid rgba(239,200,91,0.4);
+    border-radius: var(--fi-radius);
+    padding: 12px 18px;
+    font-size: 0.88rem;
+    margin-bottom: 16px;
+}
+.fi-reopen-banner strong { color: var(--fi-medium); }
 
 .fi-back { display: inline-block; margin-bottom: 16px; color: var(--fi-text-muted); font-size: 0.88rem; }
 

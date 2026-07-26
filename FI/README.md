@@ -513,6 +513,13 @@ rotalar için IP başına sabit-pencere limiti eklendi (`RateLimitingExtensions.
 Gerçek Docker Compose'da canlı doğrulandı: 101. istek 429 döndü, pencere 10 saniye sonra
 sıfırlandı, `/health/live` hiç etkilenmedi. 2 yeni test eklendi.
 
+**PB6 (UI'da tekrarlama görünürlüğü) tamamlandı.** `ReopenCount>0` daha önce yalnızca header'da
+ham bir sayaç olarak görünüyordu; ayrıca hem Detail hem Index sayfasındaki `StatusBadgeClass`
+switch'inde `"Reopened"` için bir case yoktu (nötr gri rozet gösteriyordu). Artık ayrı, amber
+`fi-badge-reopened` rozeti ve Detail'de "bu ilk kez görülen yeni bir olay değil" diyen açık bir
+banner var. Gerçek Docker Compose'da (DB'de reopen_count/status manuel güncellemesiyle
+simüle edilerek) canlı doğrulandı.
+
 ## Sonraki Adımlar (Post-M18)
 
 14 günlük planın çekirdek zinciri, CTO review'ün Faz 1 (Product Proof), Faz 2 (Production

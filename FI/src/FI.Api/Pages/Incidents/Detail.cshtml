@@ -6,6 +6,16 @@
 
 <a class="fi-back" href="/Incidents">&larr; Incidents</a>
 
+@if (Model.ReopenCount > 0)
+{
+    <div class="fi-reopen-banner">
+        <strong>⟲ Tekrarlayan incident:</strong> bu, daha önce çözülmüş/kapatılmış ama
+        @Model.ReopenCount kez yeniden açılmış (reopen) bir incident — ilk kez görülen yeni bir
+        olay değil. Aşağıdaki "İlk görülme" ve event sayısı, en son reopen'a göredir; önceki
+        çözülme geçmişini yansıtmaz.
+    </div>
+}
+
 <div class="fi-detail-header">
     <div>
         <h1 class="fi-page-title">@Model.IntegrationName — @Model.Category</h1>
@@ -13,7 +23,6 @@
             İlk görülme @Model.FirstSeen.ToLocalTime().ToString("g") ·
             Son görülme @Model.LastSeen.ToLocalTime().ToString("g") ·
             @Model.EventCount event
-            @if (Model.ReopenCount > 0) { <text> · @Model.ReopenCount kez reopen</text> }
         </div>
     </div>
     <div>
@@ -141,6 +150,7 @@ else
     {
         "NeedsHumanReview" => "fi-badge-review",
         "AiAnalyzed" or "Resolved" => "fi-badge-analyzed",
+        "Reopened" => "fi-badge-reopened",
         _ => "fi-badge-neutral"
     };
 }

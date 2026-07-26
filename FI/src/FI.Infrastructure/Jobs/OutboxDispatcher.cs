@@ -77,7 +77,7 @@ public class OutboxDispatcher
             catch (Exception ex)
             {
                 _logger.LogError(ex, "OutboxDispatcher: mesaj {MessageId} işlenirken hata oluştu.", message.Id);
-                message.MarkFailed();
+                message.MarkFailed(ex.ToString());
             }
         }
 

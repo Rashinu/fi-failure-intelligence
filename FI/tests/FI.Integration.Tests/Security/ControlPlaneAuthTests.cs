@@ -111,6 +111,16 @@ public class ControlPlaneAuthTests : IClassFixture<FiApiFactory>
     }
 
     [Fact]
+    public async Task OutboxAdminEndpoint_WithoutCredentials_Returns401()
+    {
+        var client = _factory.CreateUnauthenticatedClient();
+
+        var response = await client.GetAsync("/api/v1/admin/outbox");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
     public async Task EventIngestion_IsNotGatedByAdminAuth_UsesApiKeyInstead()
     {
         // Ingestion endpoint'leri (ApiKeyAuthMiddleware ile korunuyor) admin auth kapsamı DIŞINDA -

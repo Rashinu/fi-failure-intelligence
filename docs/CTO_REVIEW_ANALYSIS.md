@@ -134,6 +134,15 @@ birebir doğrulanıp düzeltilen iki gerçek bulgu tespit etti:
   ayrıca Hangfire'ın kendi varsayılan "yalnızca localhost" filtresi, admin kimlik bilgisiyle bile
   Docker port-forwarding arkasında güvenilmez şekilde reddediyordu. Minimal bir paylaşılan-sır
   HTTP Basic Auth kapısı eklendi. Ayrıntı için `FI/README.md`'deki ilgili nota bakın.
+- **D4** — Outbox `Failed` durumu bir çıkmaz sokaktı (ne zaman/kaç kez/neden başarısız olduğuna
+  dair iz yok, dispatcher bir daha bakmıyordu). `FailureCount`/`LastFailedAt`/`LastError` eklendi,
+  admin-görünür `GET /api/v1/admin/outbox?status=Failed` uç noktasıyla gözlemlenebilir hale
+  getirildi.
+- **D5 — rapor bu noktada hatalı, düzeltme gerekmedi.** Rapor `ClassifyJobHandler`'ın retry
+  tükenince sessizce (exception fırlatmadan) döndüğünü iddia ediyordu; kodun okunmasıyla bu doğru
+  bulunmadı — son denemedeki bir concurrency conflict, exception filter koşulu (`attempt <
+  MaxConcurrencyRetries`) false olduğundan zaten yakalanmadan yukarı fırlatılıyor. Ayrıntı için
+  `FI/README.md`'deki ilgili nota bakın.
 
 ### M19 — Customer Validation
 

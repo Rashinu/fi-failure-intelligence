@@ -86,6 +86,7 @@ jobs:
             "Integrations.IntegrationCrudTests"
             "Integrations.IntegrationRotationTests"
             "Security.ControlPlaneAuthTests"
+            "Outbox.OutboxControllerTests"
           )
           for cls in "${classes[@]}"; do
             echo "::group::$cls"

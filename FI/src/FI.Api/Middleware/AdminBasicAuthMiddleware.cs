@@ -27,6 +27,7 @@ public class AdminBasicAuthMiddleware
         "/api/v1/integrations",
         "/api/v1/prompt-versions",
         "/api/v1/incidents",
+        "/api/v1/admin",
         "/Incidents",
         "/hangfire"
     };

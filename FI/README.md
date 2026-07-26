@@ -485,6 +485,25 @@ doğrulanıp düzeltildi:
 Yerel demo için varsayılan sır `local-dev-admin-secret-change-me` (`docker-compose.yml`,
 `Admin__SharedSecret`) — **herhangi bir paylaşılan/production ortamında değiştirilmelidir.**
 
+**D4 (Outbox dead-letter görünürlüğü) düzeltildi.** `OutboxMessage.MarkFailed()` daha önce yalnızca
+`Status`'u `Failed` yapıyordu — ne zaman/kaç kez/neden başarısız olduğuna dair hiçbir iz
+bırakmıyordu, ve dispatcher'ın sorgu filtresi (`Status==Pending`) bu satırı bir daha asla
+görmüyordu. `FailureCount`/`LastFailedAt`/`LastError` alanları eklendi, `GET
+/api/v1/admin/outbox?status=Failed` (admin auth arkasında) ile gözlemlenebilir hale getirildi.
+Fresh bir veritabanına karşı migration doğrulandı, 6 yeni test (2 domain + 2 integration + 2
+auth-gate) eklendi.
+
+**D5 bulgusu — raporla çelişiyor, kod incelemesiyle düzeltme gerekmediği tespit edildi.**
+Rapor, `ClassifyJobHandler.ExecuteAsync`'in concurrency retry'lerini tükettikten sonra hiç
+exception fırlatmadan sessizce döndüğünü iddia ediyordu. Kodun birebir okunmasıyla bu **doğru
+değil**: `catch (DbUpdateException ex) when (attempt < MaxConcurrencyRetries && ...)` koşulu, tam
+olarak son denemede (`attempt == MaxConcurrencyRetries`) `false` olacak şekilde yazılmış — yani
+son denemede bir concurrency conflict oluşursa, C#'ın exception filter semantiği gereği bu catch
+bloğu hiç eşleşmez ve exception olduğu gibi yukarı (Hangfire'a) fırlatılır. `for` döngüsünün
+"sessizce sonlanıp başarılıymış gibi dönmesi" mümkün değil — her döngü adımı ya `return` ile ya da
+yakalanmamış bir `throw` ile sonlanıyor. Bu yüzden D5 için herhangi bir kod değişikliği
+yapılmadı.
+
 ## Sonraki Adımlar (Post-M18)
 
 14 günlük planın çekirdek zinciri, CTO review'ün Faz 1 (Product Proof), Faz 2 (Production

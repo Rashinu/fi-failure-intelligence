@@ -1,3 +1,4 @@
+using FI.Domain.Incidents;
 using FI.Domain.Ingestion;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -30,10 +31,16 @@ public class IntegrationEventConfiguration : IEntityTypeConfiguration<Integratio
         builder.Property(e => e.OccurredAt).HasColumnName("occurred_at").IsRequired();
         builder.Property(e => e.ReceivedAt).HasColumnName("received_at").IsRequired();
         builder.Property(e => e.AffectedCustomerRef).HasColumnName("affected_customer_ref").HasMaxLength(200);
+        builder.Property(e => e.IncidentId).HasColumnName("incident_id");
 
         builder.HasIndex(e => new { e.IntegrationId, e.OccurredAt });
         builder.HasIndex(e => e.CorrelationId);
+        builder.HasIndex(e => e.IncidentId);
 
         builder.HasOne<Integration>().WithMany().HasForeignKey(e => e.IntegrationId).OnDelete(DeleteBehavior.Cascade);
+        // Bkz. TD3 - incident silinirse (şu an bir silme yolu yok, ama gelecekte olabilir)
+        // event geçmişinin sessizce kaybolmaması için SetNull; event'in kendisi hâlâ audit/evidence
+        // amaçlı kalıcı kalmalı.
+        builder.HasOne<Incident>().WithMany().HasForeignKey(e => e.IncidentId).OnDelete(DeleteBehavior.SetNull);
     }
 }

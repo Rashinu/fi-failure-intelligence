@@ -53,4 +53,27 @@ public class IntegrationEventTests
 
         evt.AffectedCustomerRef.Should().Be("cus_demo_a");
     }
+
+    [Fact]
+    public void Create_DefaultsIncidentIdToNull()
+    {
+        var evt = IntegrationEvent.Create(
+            Guid.NewGuid(), IntegrationEventType.ApiCall, 200, null, null, null,
+            Guid.NewGuid(), null, null, null, 0, false, DateTimeOffset.UtcNow);
+
+        evt.IncidentId.Should().BeNull();
+    }
+
+    [Fact]
+    public void AssignToIncident_SetsIncidentId()
+    {
+        var evt = IntegrationEvent.Create(
+            Guid.NewGuid(), IntegrationEventType.ApiCall, 401, null, null, null,
+            Guid.NewGuid(), null, null, null, 0, false, DateTimeOffset.UtcNow);
+        var incidentId = Guid.NewGuid();
+
+        evt.AssignToIncident(incidentId);
+
+        evt.IncidentId.Should().Be(incidentId);
+    }
 }

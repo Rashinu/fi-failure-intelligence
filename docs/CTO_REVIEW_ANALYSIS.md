@@ -162,6 +162,16 @@ birebir doğrulanıp düzeltilen iki gerçek bulgu tespit etti:
   (OTel `FI.Api` meter'ına bağlı) artık her concurrency-conflict retry'sinde artıyor — önceden
   yalnızca tek tek log satırlarında görünen bir sinyal, artık toplu bir sayaç/alarm yüzeyinde de
   var.
+- **TD3 — Açık bir `IntegrationEvent`↔`Incident` ilişkisi eklendi.** Önceden "bu event'ler bu
+  incident'a mı ait" sorusu üç ayrı çağrı noktasında (`IncidentsController`,
+  `AiAnalysisJobHandler`, `Detail.cshtml.cs`) bağımsızca `IntegrationId+Category-string+zaman-
+  penceresi` (+ D2'nin 15-dakikalık payı) ile yeniden türetiliyordu. `IntegrationEvent`'e artık
+  `ClassifyJobHandler`'ın sınıflandırma anında set ettiği gerçek bir `IncidentId` FK'sı var; üç
+  çağrı noktası da artık doğrudan bu FK'ya göre filtreleniyor — zaman-penceresi tahmini yok,
+  D2'nin residual eksik-sayım riski de bu üç yerde ortadan kalktı. Fresh bir veritabanına karşı
+  migration doğrulandı (`incident_id` her event için doğru dolduruğunu DB'den doğrudan kontrol
+  ederek), 4 yeni test eklendi (2 domain + 2 integration, biri M18'den beri ilk kez affected-
+  customer sayımını otomatik test ediyor).
 
 ### M19 — Customer Validation
 

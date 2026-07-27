@@ -38,6 +38,16 @@ public class IntegrationEvent
     /// </summary>
     public string? AffectedCustomerRef { get; private set; }
 
+    /// <summary>
+    /// Bkz. docs/CTO_REVIEW_ANALYSIS.md Teknik Borç TD3 - önceden "bu event'ler bu incident'a mı
+    /// ait" sorusu, üç ayrı çağrı noktasında (IncidentsController, AiAnalysisJobHandler,
+    /// Detail.cshtml.cs) bağımsızca IntegrationId+Category-string+zaman-penceresi sorgusuyla
+    /// yeniden türetiliyordu - hem bir bakım/sapma riski hem de (D2'nin sabit-kodlanmış 15
+    /// dakikalık payı yüzünden) hâlâ eksik-sayım ihtimali taşıyordu. ClassifyJobHandler artık bu
+    /// FK'yı doğrudan sınıflandırma anında set ediyor; sorgu değil, gerçek bir ilişki.
+    /// </summary>
+    public Guid? IncidentId { get; private set; }
+
     private IntegrationEvent() { }
 
     public static IntegrationEvent Create(
@@ -86,4 +96,8 @@ public class IntegrationEvent
         if (string.IsNullOrWhiteSpace(category)) throw new ArgumentException("Category zorunludur.", nameof(category));
         Category = category;
     }
+
+    /// <summary>Bkz. TD3 - ClassifyJobHandler tarafından, event hangi incident'a bağlandıysa (yeni
+    /// açılan veya var olan) o incident'ın Id'siyle bir kez set edilir.</summary>
+    public void AssignToIncident(Guid incidentId) => IncidentId = incidentId;
 }

@@ -527,6 +527,15 @@ doğrulandı) dönüştürüldü. Ayrıca eşzamanlılık-conflict retry'leri ar
 değil, OTel `FI.Api` meter'ına bağlı bir sayaçta da (`FiJobMetrics.ClassifyJobConcurrencyRetries`)
 görünür.
 
+**TD3 (açık IntegrationEvent↔Incident ilişkisi) tamamlandı.** `IntegrationEvent`'e artık
+`ClassifyJobHandler`'ın sınıflandırma anında set ettiği gerçek bir `IncidentId` FK'sı var.
+`IncidentsController`, `AiAnalysisJobHandler` ve `Detail.cshtml.cs`'deki üç bağımsız
+`IntegrationId+Category-string+zaman-penceresi` sorgusu (D2'nin 15-dakikalık payı dahil) bu FK'ya
+göre doğrudan filtreleme ile değiştirildi — hem üç yerde ayrı ayrı bakım riski hem de D2'nin
+residual eksik-sayım riski ortadan kalktı. Fresh bir veritabanına karşı migration doğrulandı
+(`incident_id` her event için doğru dolduğu DB'den doğrudan kontrol edilerek), 4 yeni test
+eklendi.
+
 ## Sonraki Adımlar (Post-M18)
 
 14 günlük planın çekirdek zinciri, CTO review'ün Faz 1 (Product Proof), Faz 2 (Production

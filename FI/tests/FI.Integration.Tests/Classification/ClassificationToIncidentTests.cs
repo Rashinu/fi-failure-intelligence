@@ -40,10 +40,10 @@ public class ClassificationToIncidentTests : IClassFixture<FiApiFactory>
         return (created!.IntegrationId, created.ApiKey);
     }
 
-    private async Task<Guid> IngestEventAsync(HttpClient client, string apiKey, Guid integrationId, int statusCode, object? response = null)
+    private async Task<Guid> IngestEventAsync(HttpClient client, string apiKey, Guid integrationId, int statusCode, object? response = null, string? customerRef = null)
     {
         var ingestResponse = await client.PostAsJsonAsync("/api/v1/events",
-            new IngestEventRequest(integrationId, "ApiCall", statusCode, null, response, 100, DateTimeOffset.UtcNow));
+            new IngestEventRequest(integrationId, "ApiCall", statusCode, null, response, 100, DateTimeOffset.UtcNow, customerRef));
         ingestResponse.EnsureSuccessStatusCode();
         var body = await ingestResponse.Content.ReadFromJsonAsync<IngestEventResponse>();
         return body!.EventId;
@@ -75,6 +75,64 @@ public class ClassificationToIncidentTests : IClassFixture<FiApiFactory>
 
         incidents.Should().HaveCount(1);
         incidents[0].EventCount.Should().Be(5);
+    }
+
+    /// <summary>
+    /// TD3 doğrulaması: ClassifyJobHandler'ın her sınıflandırılan event'e set ettiği IncidentId
+    /// FK'sının, o event'i gerçekten doğru incident'a bağladığını doğrudan kontrol eder (bir
+    /// zaman-penceresi tahmini değil, gerçek bir ilişki).
+    /// </summary>
+    [Fact]
+    public async Task ClassifiedEvents_AreAssignedToTheirIncidentViaForeignKey()
+    {
+        var client = _factory.CreateClient();
+        var (integrationId, apiKey) = await CreateIntegrationAsync(client);
+        client.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
+
+        var eventIds = new List<Guid>();
+        for (var i = 0; i < 3; i++)
+        {
+            var eventId = await IngestEventAsync(client, apiKey, integrationId, 401);
+            await RunClassifyAsync(eventId, Guid.NewGuid());
+            eventIds.Add(eventId);
+        }
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<FiDbContext>();
+        var incident = await db.Incidents.SingleAsync(i => i.IntegrationId == integrationId);
+        var events = await db.IntegrationEvents.Where(e => eventIds.Contains(e.Id)).ToListAsync();
+
+        events.Should().HaveCount(3);
+        events.Should().OnlyContain(e => e.IncidentId == incident.Id);
+    }
+
+    /// <summary>
+    /// TD3 doğrulaması: affected-customer sayısının artık IncidentId FK'sına göre doğru
+    /// hesaplandığını (M18'de yalnızca canlı doğrulanmış, otomatik test edilmemiş bir davranışı)
+    /// doğrular.
+    /// </summary>
+    [Fact]
+    public async Task AffectedCustomerCount_ReflectsOnlyEventsAssignedToThisIncident()
+    {
+        var client = _factory.CreateClient();
+        var (integrationId, apiKey) = await CreateIntegrationAsync(client);
+        client.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
+
+        var e1 = await IngestEventAsync(client, apiKey, integrationId, 401, customerRef: "cus_a");
+        await RunClassifyAsync(e1, Guid.NewGuid());
+        var e2 = await IngestEventAsync(client, apiKey, integrationId, 401, customerRef: "cus_b");
+        await RunClassifyAsync(e2, Guid.NewGuid());
+        var e3 = await IngestEventAsync(client, apiKey, integrationId, 401, customerRef: "cus_a");
+        await RunClassifyAsync(e3, Guid.NewGuid());
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<FiDbContext>();
+        var incident = await db.Incidents.SingleAsync(i => i.IntegrationId == integrationId);
+
+        var response = await client.GetAsync($"/api/v1/incidents/{incident.Id}");
+        var body = await response.Content.ReadFromJsonAsync<FI.Application.Incidents.IncidentDetailResponse>();
+
+        body!.AffectedCustomerCount.Should().Be(2);
     }
 
     [Fact]

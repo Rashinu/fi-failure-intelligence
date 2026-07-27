@@ -159,6 +159,10 @@ public class ClassifyJobHandler
             needsEvidenceCollection = true;
         }
 
+        // Bkz. TD3 - event'i, ait olduğu incident'a doğrudan bir FK ile bağlar (Incident.Open()
+        // Id'yi bellekte hemen üretiyor, SaveChangesAsync'i beklemeye gerek yok).
+        evt.AssignToIncident(incidentForEvidence.Id);
+
         if (needsEvidenceCollection)
         {
             _db.OutboxMessages.Add(OutboxMessage.Create(

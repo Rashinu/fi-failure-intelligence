@@ -49,14 +49,10 @@ public class DetailModel : PageModel
             .Where(a => a.IncidentId == id && a.IsLatest)
             .FirstOrDefaultAsync(cancellationToken);
 
-        // Bkz. IncidentsController.GetById - ayni "FirstSeen guvenlik payi" mantigi burada da
-        // kullanilir (paralel ClassifyJob'larin FirstSeen'i kronolojik ilk event'e sabitlememesi).
-        var windowStart = incident.FirstSeen - TimeSpan.FromMinutes(15);
+        // Bkz. IncidentsController.GetById / TD3 - gercek IncidentId FK'sina gore filtreleniyor,
+        // zaman-penceresi tahmini yok.
         var distinctCustomerRefs = await _db.IntegrationEvents.AsNoTracking()
-            .Where(e => e.IntegrationId == incident.IntegrationId
-                        && e.Category == incident.Category.ToString()
-                        && e.OccurredAt >= windowStart && e.OccurredAt <= incident.LastSeen
-                        && e.AffectedCustomerRef != null)
+            .Where(e => e.IncidentId == incident.Id && e.AffectedCustomerRef != null)
             .Select(e => e.AffectedCustomerRef)
             .Distinct()
             .CountAsync(cancellationToken);

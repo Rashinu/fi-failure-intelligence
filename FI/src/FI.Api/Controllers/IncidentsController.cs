@@ -85,24 +85,15 @@ public class IncidentsController : ControllerBase
             .Where(a => a.IncidentId == id && a.IsLatest)
             .FirstOrDefaultAsync(cancellationToken);
 
-        // Bkz. docs/CTO_REVIEW_ANALYSIS.md M18 - "kac musteri etkilendi". Incident'in kendi
-        // event'lerine dogrudan bir FK yok (fingerprint uzerinden gruplaniyor); ClassifyJobHandler'in
-        // severity hesabinda kullandigi ayni kategori+entegrasyon+zaman-penceresi mantigi burada da
-        // kullanilir. Hicbir event customer ref tasimiyorsa (provider desteklemiyorsa) null donulur -
-        // "0 musteri" ile "bu veri hic yok" birbirinden ayirt edilir.
-        //
-        // FirstSeen alt sinir icin bir guvenlik payi ile genisletilir: paralel Hangfire worker'lari
-        // ayni fingerprint icin coklu ClassifyJob calistirabildiginden (bkz. ClassifyJobHandler'in
-        // basindaki eszamanlilik notu), incident'i "acan" event kronolojik olarak ilk event olmak
-        // zorunda degildir - sadece insert yarisini kazanan event'tir. Bu yuzden FirstSeen bazen
-        // ayni patlamadaki daha erken event'lerden sonra gelebilir; pay olmadan bu erken event'lerin
-        // customer ref'leri sessizce sayima girmez.
-        var windowStart = incident.FirstSeen - TimeSpan.FromMinutes(15);
+        // Bkz. docs/CTO_REVIEW_ANALYSIS.md M18/TD3 - "kac musteri etkilendi". Onceden burada
+        // dogrudan bir FK olmadigi icin IntegrationId+Category-string+zaman-penceresi (+ D2'nin
+        // 15-dakikalik payi) ile yeniden turetiliyordu; artik ClassifyJobHandler'in sinif
+        // landirma aninda set ettigi gercek IncidentId FK'sina (bkz. IntegrationEvent.IncidentId)
+        // gore dogrudan filtreleniyor - zaman penceresi tahmini yok, kayip yok. Hicbir event
+        // customer ref tasimiyorsa (provider desteklemiyorsa) null donulur - "0 musteri" ile
+        // "bu veri hic yok" birbirinden ayirt edilir.
         var distinctCustomerRefs = await _db.IntegrationEvents.AsNoTracking()
-            .Where(e => e.IntegrationId == incident.IntegrationId
-                        && e.Category == incident.Category.ToString()
-                        && e.OccurredAt >= windowStart && e.OccurredAt <= incident.LastSeen
-                        && e.AffectedCustomerRef != null)
+            .Where(e => e.IncidentId == incident.Id && e.AffectedCustomerRef != null)
             .Select(e => e.AffectedCustomerRef)
             .Distinct()
             .CountAsync(cancellationToken);

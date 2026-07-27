@@ -68,10 +68,10 @@ public class AiAnalysisJobHandler
             return;
         }
 
+        // Bkz. TD3 - gercek IncidentId FK'sina gore, zaman-penceresi tahmini yok (bkz.
+        // IncidentsController.GetById'deki ayni degisiklik).
         var affectedRequests = await _db.IntegrationEvents.CountAsync(
-            e => e.IntegrationId == incident.IntegrationId && e.Category == incident.Category.ToString()
-                 && e.OccurredAt >= incident.FirstSeen && e.OccurredAt <= incident.LastSeen,
-            cancellationToken);
+            e => e.IncidentId == incident.Id, cancellationToken);
 
         var integrationName = integration is null ? "unknown" : integration.Name;
 

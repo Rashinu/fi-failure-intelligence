@@ -183,6 +183,23 @@ birebir doğrulanıp düzeltilen iki gerçek bulgu tespit etti:
   Docker Compose'da canlı doğrulandı: konsol trace exporter'ında her `ClassifyJob` span'inin
   `ParentSpanId`/`TraceId`'sinin orijinal HTTP isteğinin trace'iyle doğru eşleştiği doğrudan
   gözlemlendi. 4 yeni test eklendi.
+- **TD6 — çoklu-replica altında `OutboxDispatcher` güvenliği canlı doğrulandı (kod değişikliği
+  gerekmedi).** Gerçek 2 `fi-app` replikası (izole, geçici bir Docker Compose stack'i, aynı
+  Postgres/Hangfire storage'ı paylaşan) ile 10 event'lik gerçek bir eşzamanlı patlama gönderildi;
+  hepsi tam olarak bir kez sınıflandırıldı, tek bir incident satırı `event_count=10` ile oluştu,
+  hiçbir outbox mesajı `Failed`/tekrar-dispatch edilmedi. Hangfire'ın recurring-job distributed
+  lock mekanizması beklendiği gibi çalışıyor.
+  **Bu test sırasında ayrı, önceden bilinmeyen bir bulgu ortaya çıktı:** 2 replika mutlak
+  eşzamanlı (soğuk/ilk kez) başladığında, Hangfire.PostgreSql kütüphanesinin kendi şema kurulumu
+  (`CREATE SCHEMA "hangfire"`) iki replika arasında yarışa giriyor ve kaybeden replika
+  `23505 duplicate key value violates unique constraint "pg_namespace_nspname_index"` ile
+  **çöküyor** (bir kez yeniden başlatıldığında şema zaten var olduğu için sorunsuz açılıyor).
+  Bu, `OutboxDispatcher`'ın kendisiyle ilgili değil - `fi-migrate` adımı yalnızca FI'nin kendi EF
+  Core migration'larını uyguluyor, Hangfire'ın storage şemasını değil; o, ilk bağlanan `fi-app`
+  instance'ı tarafından lazily oluşturuluyor. Soğuk, çoklu-replica bir ilk deploy'da gerçek bir
+  risk - düzeltilmedi (kapsam dışında bırakıldı, TD6'nın orijinal sorusu değildi), ama
+  `fi-migrate` adımının Hangfire şemasını da (yalnızca sunucuyu başlatmadan) kurmasıyla kolayca
+  kapatılabilir bir açık olarak not edildi.
 
 ### M19 — Customer Validation
 

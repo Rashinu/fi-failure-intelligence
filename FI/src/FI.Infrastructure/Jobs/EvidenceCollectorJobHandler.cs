@@ -34,8 +34,10 @@ public class EvidenceCollectorJobHandler
         _logger = logger;
     }
 
-    public async Task ExecuteAsync(Guid incidentId, Guid correlationId, CancellationToken cancellationToken = default)
+    public async Task ExecuteAsync(Guid incidentId, Guid correlationId, CancellationToken cancellationToken = default, string? traceParent = null)
     {
+        using var activity = FiTelemetry.StartLinkedActivity("EvidenceCollectorJob", traceParent);
+
         var incident = await _db.Incidents.FirstOrDefaultAsync(i => i.Id == incidentId, cancellationToken);
         if (incident is null)
         {

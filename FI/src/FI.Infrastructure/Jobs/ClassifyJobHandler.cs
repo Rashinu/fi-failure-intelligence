@@ -42,8 +42,10 @@ public class ClassifyJobHandler
         _logger = logger;
     }
 
-    public async Task ExecuteAsync(Guid eventId, Guid correlationId, CancellationToken cancellationToken = default)
+    public async Task ExecuteAsync(Guid eventId, Guid correlationId, CancellationToken cancellationToken = default, string? traceParent = null)
     {
+        using var activity = FiTelemetry.StartLinkedActivity("ClassifyJob", traceParent);
+
         for (var attempt = 1; attempt <= MaxConcurrencyRetries; attempt++)
         {
             try

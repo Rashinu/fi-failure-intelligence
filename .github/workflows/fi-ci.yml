@@ -88,6 +88,7 @@ jobs:
             "Security.ControlPlaneAuthTests"
             "Security.RateLimitingTests"
             "Outbox.OutboxControllerTests"
+            "Jobs.FiTelemetryTests"
           )
           for cls in "${classes[@]}"; do
             echo "::group::$cls"

@@ -33,6 +33,17 @@ public class OutboxMessage
     public DateTimeOffset? LastFailedAt { get; private set; }
     public string? LastError { get; private set; }
 
+    /// <summary>
+    /// Bkz. docs/CTO_REVIEW_ANALYSIS.md Teknik Borç TD8 - önceden yalnızca bir correlation-id
+    /// string'i el ile job payload'ları ve metod imzaları üzerinden taşınıyordu; bu, FI'nin kendi
+    /// logları arasında ilişkilendirme sağlıyordu ama gerçek W3C trace-context (traceparent)
+    /// olmadığından, harici bir OpenTelemetry backend'inde (Jaeger/Tempo) job'lar arası span
+    /// hiyerarşisi kurulmuyordu. `Create()` çağrıldığı anda `Activity.Current?.Id`'yi (varsa)
+    /// otomatik yakalar; job handler'lar (bkz. ClassifyJobHandler/EvidenceCollectorJobHandler/
+    /// AiAnalysisJobHandler) bunu kendi Activity'lerinin parent'ı olarak kullanır.
+    /// </summary>
+    public string? TraceParent { get; private set; }
+
     private OutboxMessage() { }
 
     public static OutboxMessage Create(OutboxMessageType messageType, string payload)
@@ -45,7 +56,8 @@ public class OutboxMessage
             MessageType = messageType,
             Payload = payload,
             Status = OutboxMessageStatus.Pending,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow,
+            TraceParent = System.Diagnostics.Activity.Current?.Id
         };
     }
 

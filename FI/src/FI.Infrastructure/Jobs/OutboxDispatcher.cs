@@ -48,7 +48,7 @@ public class OutboxDispatcher
                         var payload = JsonDocument.Parse(message.Payload).RootElement;
                         var eventId = payload.GetProperty("eventId").GetGuid();
                         var correlationId = payload.GetProperty("correlationId").GetGuid();
-                        _backgroundJobClient.Enqueue<ClassifyJobHandler>(h => h.ExecuteAsync(eventId, correlationId, CancellationToken.None));
+                        _backgroundJobClient.Enqueue<ClassifyJobHandler>(h => h.ExecuteAsync(eventId, correlationId, CancellationToken.None, message.TraceParent));
                         break;
                     }
                     case OutboxMessageType.EvidenceCollectorJob:
@@ -56,7 +56,7 @@ public class OutboxDispatcher
                         var payload = JsonDocument.Parse(message.Payload).RootElement;
                         var incidentId = payload.GetProperty("incidentId").GetGuid();
                         var correlationId = payload.GetProperty("correlationId").GetGuid();
-                        _backgroundJobClient.Enqueue<EvidenceCollectorJobHandler>(h => h.ExecuteAsync(incidentId, correlationId, CancellationToken.None));
+                        _backgroundJobClient.Enqueue<EvidenceCollectorJobHandler>(h => h.ExecuteAsync(incidentId, correlationId, CancellationToken.None, message.TraceParent));
                         break;
                     }
                     case OutboxMessageType.AiAnalysisJob:
@@ -64,7 +64,7 @@ public class OutboxDispatcher
                         var payload = JsonDocument.Parse(message.Payload).RootElement;
                         var incidentId = payload.GetProperty("incidentId").GetGuid();
                         var correlationId = payload.GetProperty("correlationId").GetGuid();
-                        _backgroundJobClient.Enqueue<AiAnalysisJobHandler>(h => h.ExecuteAsync(incidentId, correlationId, CancellationToken.None));
+                        _backgroundJobClient.Enqueue<AiAnalysisJobHandler>(h => h.ExecuteAsync(incidentId, correlationId, CancellationToken.None, message.TraceParent));
                         break;
                     }
                     default:

@@ -21,6 +21,7 @@ public class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage
         builder.Property(m => m.FailureCount).HasColumnName("failure_count").IsRequired();
         builder.Property(m => m.LastFailedAt).HasColumnName("last_failed_at");
         builder.Property(m => m.LastError).HasColumnName("last_error").HasMaxLength(2000);
+        builder.Property(m => m.TraceParent).HasColumnName("trace_parent").HasMaxLength(100);
 
         builder.HasIndex(m => new { m.Status, m.CreatedAt });
     }

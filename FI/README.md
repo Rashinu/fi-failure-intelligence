@@ -536,6 +536,14 @@ residual eksik-sayım riski ortadan kalktı. Fresh bir veritabanına karşı mig
 (`incident_id` her event için doğru dolduğu DB'den doğrudan kontrol edilerek), 4 yeni test
 eklendi.
 
+**TD8 (Hangfire job sınırları arasında W3C trace-context yayılımı) tamamlandı.** `OutboxMessage`
+artık oluşturulduğu andaki `Activity.Current?.Id`'yi otomatik yakalıyor; `ClassifyJobHandler`/
+`EvidenceCollectorJobHandler`/`AiAnalysisJobHandler` bunu (`FiTelemetry.StartLinkedActivity`
+üzerinden) kendi Activity'lerinin parent'ı olarak kullanıyor — daha önce hiç Activity üretmeyen
+`AddSource("FI.Api")` kancası ilk kez gerçek span'lerle doluyor. Gerçek Docker Compose'da canlı
+doğrulandı: konsol trace exporter'ında her `ClassifyJob` span'inin `ParentSpanId`/`TraceId`'sinin
+orijinal HTTP isteğinin trace'iyle doğru eşleştiği doğrudan gözlemlendi. 4 yeni test eklendi.
+
 ## Sonraki Adımlar (Post-M18)
 
 14 günlük planın çekirdek zinciri, CTO review'ün Faz 1 (Product Proof), Faz 2 (Production

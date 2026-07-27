@@ -172,6 +172,17 @@ birebir doğrulanıp düzeltilen iki gerçek bulgu tespit etti:
   migration doğrulandı (`incident_id` her event için doğru dolduruğunu DB'den doğrudan kontrol
   ederek), 4 yeni test eklendi (2 domain + 2 integration, biri M18'den beri ilk kez affected-
   customer sayımını otomatik test ediyor).
+- **TD8 — Hangfire job sınırları arasında gerçek W3C trace-context yayılımı eklendi.** Önceden
+  yalnızca manuel bir correlation-id string'i job payload'ları ve metod imzaları üzerinden
+  taşınıyordu; FI'nin kendi logları arasında ilişkilendirme sağlıyordu ama harici bir OTel
+  backend'inde (Jaeger/Tempo) job'lar arası gerçek bir span hiyerarşisi kurmuyordu. `OutboxMessage`
+  artık oluşturulduğu andaki `Activity.Current?.Id`'yi otomatik yakalıyor (`TraceParent`);
+  `ClassifyJobHandler`/`EvidenceCollectorJobHandler`/`AiAnalysisJobHandler` bunu kendi
+  Activity'lerinin parent'ı olarak kullanıyor (`FiTelemetry.StartLinkedActivity`, daha önce hiç
+  Activity üretmeyen `AddSource("FI.Api")` kancasını ilk kez gerçek span'lerle dolduruyor). Gerçek
+  Docker Compose'da canlı doğrulandı: konsol trace exporter'ında her `ClassifyJob` span'inin
+  `ParentSpanId`/`TraceId`'sinin orijinal HTTP isteğinin trace'iyle doğru eşleştiği doğrudan
+  gözlemlendi. 4 yeni test eklendi.
 
 ### M19 — Customer Validation
 

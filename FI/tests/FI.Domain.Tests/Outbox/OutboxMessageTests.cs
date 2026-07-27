@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using FI.Domain.Outbox;
 using FluentAssertions;
 using Xunit;
@@ -13,6 +14,39 @@ public class OutboxMessageTests
 
         message.Status.Should().Be(OutboxMessageStatus.Pending);
         message.DispatchedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void Create_WithoutActiveActivity_TraceParentIsNull()
+    {
+        Activity.Current.Should().BeNull("bu test bağımsız çalışıyor, ortamda aktif bir Activity olmamalı");
+
+        var message = OutboxMessage.Create(OutboxMessageType.ClassifyJob, "{\"eventId\":\"...\"}");
+
+        message.TraceParent.Should().BeNull();
+    }
+
+    /// <summary>
+    /// TD8 doğrulaması: `Create()`, çağrıldığı anda aktif bir W3C Activity varsa onun Id'sini
+    /// (traceparent string'i) otomatik yakalar - ClassifyJobHandler/EvidenceCollectorJobHandler/
+    /// AiAnalysisJobHandler bunu kendi Activity'lerinin parent'ı olarak kullanır (bkz. FiTelemetry).
+    /// </summary>
+    [Fact]
+    public void Create_WithActiveActivity_CapturesTraceParent()
+    {
+        using var source = new ActivitySource("FI.Domain.Tests.Outbox");
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = _ => true,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        using var activity = source.StartActivity("test-span");
+
+        var message = OutboxMessage.Create(OutboxMessageType.ClassifyJob, "{\"eventId\":\"...\"}");
+
+        message.TraceParent.Should().Be(activity!.Id);
     }
 
     [Fact]

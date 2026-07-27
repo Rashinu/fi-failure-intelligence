@@ -54,6 +54,7 @@ public class ClassifyJobHandler
             catch (DbUpdateException ex) when (attempt < MaxConcurrencyRetries && IsConcurrencyConflict(ex))
             {
                 _db.ChangeTracker.Clear();
+                FiJobMetrics.ClassifyJobConcurrencyRetries.Add(1);
                 _logger.LogWarning(ex,
                     "ClassifyJob: event {EventId} için incident güncellemesi eşzamanlılık çakışması nedeniyle {Attempt}. kez yeniden deneniyor.",
                     eventId, attempt);
@@ -99,10 +100,23 @@ public class ClassifyJobHandler
         // sınıflandırılan event, DB'de hâlâ eski (null) category ile duruyor ve aşağıdaki
         // count sorgularından kendi kendini dışlıyordu (off-by-one). Güncel event'i, düştüğü
         // her pencereye elle +1 ekleyerek dahil ediyoruz.
-        var recentEventsQuery = _db.IntegrationEvents.Where(e => e.IntegrationId == evt.IntegrationId && e.Category == result.Category.ToString());
-        var count10 = await recentEventsQuery.CountAsync(e => e.OccurredAt >= since10Min, cancellationToken);
-        var count15 = await recentEventsQuery.CountAsync(e => e.OccurredAt >= since15Min, cancellationToken);
-        var count30 = await recentEventsQuery.CountAsync(e => e.OccurredAt >= since30Min, cancellationToken);
+        //
+        // TD1: üç ayrı COUNT sorgusu yerine (her biri kendi round trip'i), tek bir sorguda
+        // koşullu aggregation (Npgsql bunu COUNT(*) FILTER (WHERE ...) olarak çeviriyor).
+        var windowCounts = await _db.IntegrationEvents
+            .Where(e => e.IntegrationId == evt.IntegrationId && e.Category == result.Category.ToString())
+            .GroupBy(e => 1)
+            .Select(g => new
+            {
+                Count10 = g.Count(e => e.OccurredAt >= since10Min),
+                Count15 = g.Count(e => e.OccurredAt >= since15Min),
+                Count30 = g.Count(e => e.OccurredAt >= since30Min)
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var count10 = windowCounts?.Count10 ?? 0;
+        var count15 = windowCounts?.Count15 ?? 0;
+        var count30 = windowCounts?.Count30 ?? 0;
 
         if (evt.OccurredAt >= since10Min) count10++;
         if (evt.OccurredAt >= since15Min) count15++;

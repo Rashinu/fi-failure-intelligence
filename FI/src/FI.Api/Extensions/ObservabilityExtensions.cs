@@ -1,3 +1,4 @@
+using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
@@ -28,6 +29,20 @@ public static class ObservabilityExtensions
                 if (!string.IsNullOrWhiteSpace(otlpEndpoint))
                 {
                     tracing.AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint));
+                }
+            })
+            // Bkz. docs/CTO_REVIEW_ANALYSIS.md Teknik Borç TD2 - FiJobMetrics'teki
+            // eşzamanlılık-retry sayacının (bkz. FI.Infrastructure/Jobs/FiJobMetrics.cs)
+            // görünür olması için bu meter'ı OTel metrics pipeline'ına bağlar.
+            .WithMetrics(metrics =>
+            {
+                metrics
+                    .AddMeter("FI.Api")
+                    .AddConsoleExporter();
+
+                if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+                {
+                    metrics.AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint));
                 }
             });
 

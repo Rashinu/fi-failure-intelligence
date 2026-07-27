@@ -520,6 +520,13 @@ switch'inde `"Reopened"` için bir case yoktu (nötr gri rozet gösteriyordu). A
 banner var. Gerçek Docker Compose'da (DB'de reopen_count/status manuel güncellemesiyle
 simüle edilerek) canlı doğrulandı.
 
+**TD1 (severity-pencere sorgu birleştirme) ve TD2 (concurrency-retry metriği) tamamlandı.**
+`ClassifyJobHandler`'daki 3 ayrı `count10/15/30` sorgusu, tek bir sorguda koşullu aggregation'a
+(`COUNT(*) FILTER (WHERE ...)`, gerçek Postgres'e karşı üretilen SQL doğrudan incelenerek
+doğrulandı) dönüştürüldü. Ayrıca eşzamanlılık-conflict retry'leri artık yalnızca log satırlarında
+değil, OTel `FI.Api` meter'ına bağlı bir sayaçta da (`FiJobMetrics.ClassifyJobConcurrencyRetries`)
+görünür.
+
 ## Sonraki Adımlar (Post-M18)
 
 14 günlük planın çekirdek zinciri, CTO review'ün Faz 1 (Product Proof), Faz 2 (Production

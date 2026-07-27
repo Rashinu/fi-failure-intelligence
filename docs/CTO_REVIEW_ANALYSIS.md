@@ -154,6 +154,14 @@ birebir doğrulanıp düzeltilen iki gerçek bulgu tespit etti:
   "Reopened" rozeti ve Detail sayfasında "bu ilk kez görülen yeni bir olay değil" diyen açık bir
   banner var. Gerçek Docker Compose'da (DB'de manuel reopen_count/status güncellemesiyle) canlı
   doğrulandı.
+- **TD1 — 3 ayrı severity-penceresi COUNT sorgusu tek sorguya toplandı.** `ClassifyJobHandler`
+  artık `count10/15/30`'u üç ayrı round trip yerine tek bir sorguda (Npgsql bunu
+  `COUNT(*) FILTER (WHERE ...)` olarak çeviriyor) hesaplıyor. Gerçek Postgres'e karşı üretilen
+  SQL doğrudan incelenerek doğrulandı.
+- **TD2 — Eşzamanlılık-retry'leri için bir metrik eklendi.** `FiJobMetrics.ClassifyJobConcurrencyRetries`
+  (OTel `FI.Api` meter'ına bağlı) artık her concurrency-conflict retry'sinde artıyor — önceden
+  yalnızca tek tek log satırlarında görünen bir sinyal, artık toplu bir sayaç/alarm yüzeyinde de
+  var.
 
 ### M19 — Customer Validation
 

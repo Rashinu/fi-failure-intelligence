@@ -183,8 +183,9 @@ birebir doğrulanıp düzeltilen iki gerçek bulgu tespit etti:
   Docker Compose'da canlı doğrulandı: konsol trace exporter'ında her `ClassifyJob` span'inin
   `ParentSpanId`/`TraceId`'sinin orijinal HTTP isteğinin trace'iyle doğru eşleştiği doğrudan
   gözlemlendi. 4 yeni test eklendi.
-- **TD6 — çoklu-replica altında `OutboxDispatcher` güvenliği canlı doğrulandı (kod değişikliği
-  gerekmedi).** Gerçek 2 `fi-app` replikası (izole, geçici bir Docker Compose stack'i, aynı
+- **TD6 — çoklu-replica altında `OutboxDispatcher` güvenliği canlı doğrulandı (kendisi için kod
+  değişikliği gerekmedi; testte bulunan ayrı bir Hangfire şema yarışı düzeltildi).** Gerçek 2
+  `fi-app` replikası (izole, geçici bir Docker Compose stack'i, aynı
   Postgres/Hangfire storage'ı paylaşan) ile 10 event'lik gerçek bir eşzamanlı patlama gönderildi;
   hepsi tam olarak bir kez sınıflandırıldı, tek bir incident satırı `event_count=10` ile oluştu,
   hiçbir outbox mesajı `Failed`/tekrar-dispatch edilmedi. Hangfire'ın recurring-job distributed
@@ -196,10 +197,14 @@ birebir doğrulanıp düzeltilen iki gerçek bulgu tespit etti:
   **çöküyor** (bir kez yeniden başlatıldığında şema zaten var olduğu için sorunsuz açılıyor).
   Bu, `OutboxDispatcher`'ın kendisiyle ilgili değil - `fi-migrate` adımı yalnızca FI'nin kendi EF
   Core migration'larını uyguluyor, Hangfire'ın storage şemasını değil; o, ilk bağlanan `fi-app`
-  instance'ı tarafından lazily oluşturuluyor. Soğuk, çoklu-replica bir ilk deploy'da gerçek bir
-  risk - düzeltilmedi (kapsam dışında bırakıldı, TD6'nın orijinal sorusu değildi), ama
-  `fi-migrate` adımının Hangfire şemasını da (yalnızca sunucuyu başlatmadan) kurmasıyla kolayca
-  kapatılabilir bir açık olarak not edildi.
+  instance'ı tarafından lazily oluşturuluyordu. **Sonradan düzeltildi:** `Program.cs`'in
+  `--migrate` modu artık `IGlobalConfiguration`'ı da resolve ediyor - bu, Hangfire'ın
+  `PostgreSqlStorage` kurucusunu (ve dolayısıyla şema kurulumunu) sunucuyu hiç başlatmadan,
+  `fi-migrate`'in tek/garantili-seri instance'ında tetikliyor. Aynı 2-replika senaryosu (izole
+  Docker Compose stack'i, sıfırdan/soğuk başlangıç) yeniden çalıştırılarak doğrulandı: her iki
+  replika da artık hiç çökmeden ayağa kalkıyor, `fi-migrate` loglarında "Hangfire SQL objects
+  installed." satırı görülüyor. Normal tek-instance geliştirme stack'i ve demo seed script'i de
+  bu değişiklikten sonra yeniden doğrulandı.
 
 ### M19 — Customer Validation
 

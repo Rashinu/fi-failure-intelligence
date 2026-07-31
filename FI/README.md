@@ -544,20 +544,21 @@ artık oluşturulduğu andaki `Activity.Current?.Id`'yi otomatik yakalıyor; `Cl
 doğrulandı: konsol trace exporter'ında her `ClassifyJob` span'inin `ParentSpanId`/`TraceId`'sinin
 orijinal HTTP isteğinin trace'iyle doğru eşleştiği doğrudan gözlemlendi. 4 yeni test eklendi.
 
-**TD6 (çoklu-replica altında OutboxDispatcher güvenliği) canlı doğrulandı, kod değişikliği
-gerekmedi.** İzole, geçici bir Docker Compose stack'inde gerçek 2 `fi-app` replikası aynı
-Postgres/Hangfire storage'ı paylaştı; 10 event'lik gerçek bir eşzamanlı patlama tam olarak bir
-kez sınıflandırıldı, tek bir incident `event_count=10` ile oluştu, hiçbir outbox mesajı
-tekrar-dispatch edilmedi — Hangfire'ın recurring-job distributed lock'u beklendiği gibi çalışıyor.
+**TD6 (çoklu-replica altında OutboxDispatcher güvenliği) canlı doğrulandı; testte bulunan ayrı
+bir Hangfire şema yarışı düzeltildi.** İzole, geçici bir Docker Compose stack'inde gerçek 2
+`fi-app` replikası aynı Postgres/Hangfire storage'ı paylaştı; 10 event'lik gerçek bir eşzamanlı
+patlama tam olarak bir kez sınıflandırıldı, tek bir incident `event_count=10` ile oluştu, hiçbir
+outbox mesajı tekrar-dispatch edilmedi — Hangfire'ın recurring-job distributed lock'u beklendiği
+gibi çalışıyor; `OutboxDispatcher`'ın kendisi için kod değişikliği gerekmedi.
 
 Bu test sırasında ayrı bir bulgu ortaya çıktı: 2 replika mutlak eşzamanlı (soğuk/ilk kez)
 başladığında, Hangfire.PostgreSql'in kendi şema kurulumu (`CREATE SCHEMA "hangfire"`) iki replika
-arasında yarışıyor ve kaybeden `23505` ile çöküyor (yeniden başlatılınca şema zaten var olduğu
-için sorunsuz açılıyor). `fi-migrate` yalnızca FI'nin EF Core migration'larını uyguluyor,
-Hangfire'ın storage şemasını değil — o, ilk bağlanan `fi-app` instance'ı tarafından lazily
-oluşturuluyor. Soğuk, çoklu-replica bir ilk deploy'da gerçek bir risk; düzeltilmedi (TD6'nın
-orijinal kapsamı dışındaydı), ama `fi-migrate` adımının Hangfire şemasını da kurmasıyla kolayca
-kapatılabilir.
+arasında yarışıyor ve kaybeden `23505` ile çöküyordu. **Düzeltildi:** `Program.cs`'in `--migrate`
+modu artık `IGlobalConfiguration`'ı da resolve ediyor — bu, Hangfire'ın şema kurulumunu sunucuyu
+hiç başlatmadan, `fi-migrate`'in tek/garantili-seri instance'ında tetikliyor. Aynı 2-replika
+senaryosu sıfırdan yeniden çalıştırılarak doğrulandı: her iki replika da artık hiç çökmeden ayağa
+kalkıyor. Normal tek-instance geliştirme stack'i ve demo seed script'i de bu değişiklikten sonra
+yeniden doğrulandı.
 
 ## Sonraki Adımlar (Post-M18)
 

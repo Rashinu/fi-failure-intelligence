@@ -71,6 +71,15 @@ if (args.Contains("--migrate"))
         await db.SaveChangesAsync();
     }
 
+    // Bkz. docs/CTO_REVIEW_ANALYSIS.md TD6 - gerçek 2-replika testinde bulundu: Hangfire'ın kendi
+    // storage şeması (CREATE SCHEMA "hangfire") normalde ilk bağlanan fi-app instance'ı tarafından
+    // lazily kuruluyordu - 2+ replika soğuk başlangıçta eşzamanlı bağlanırsa bu bir yarışa girip
+    // kaybeden 23505 ile çöküyordu. IGlobalConfiguration'ı burada, migrate adımının tek
+    // (garantili-seri) instance'ında resolve etmek, Hangfire'ın PostgreSqlStorage kurucusunu (ve
+    // dolayısıyla şema kurulumunu) sunucuyu hiç başlatmadan tetikler - herhangi bir fi-app
+    // replikası ayağa kalkmadan önce şema garantili olarak var olur.
+    scope.ServiceProvider.GetRequiredService<Hangfire.IGlobalConfiguration>();
+
     Log.Information("Migrator modu tamamlandı, çıkılıyor.");
     return;
 }

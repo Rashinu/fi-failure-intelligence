@@ -206,16 +206,35 @@ birebir doğrulanıp düzeltilen iki gerçek bulgu tespit etti:
   installed." satırı görülüyor. Normal tek-instance geliştirme stack'i ve demo seed script'i de
   bu değişiklikten sonra yeniden doğrulandı.
 
-### M19 — Customer Validation
+### M19 — Close the Product Loop (Business Operation Identity, Incident Resolution, AI Trust Calibration) — ✅ TAMAMLANDI
+
+Ayrı bir "Product Reality Audit"in bulduğu üç P0 ürün açığını kapatan milestone. Ayrıntı için
+`docs/product/M19_CLOSE_THE_PRODUCT_LOOP.md`. Kısaca: `IntegrationEvent`'e opsiyonel
+`OperationRef`/`OperationType`/`BusinessRecordRef` eklendi (43 event ≠ 43 iş operasyonu ayrımı,
+dürüst "None/Partial/Complete" coverage semantiği ile); `Incident.Resolve()` domain metodu ve
+`POST /api/v1/incidents/{id}/resolve` eklendi (daha önce hiç ulaşılamayan `Resolved` durumu artık
+gerçek, mevcut Reopen/cooldown mekanizmasıyla entegre); `AiAnalysisValidator.CheckGrounding`,
+gerçek testlerle teşhis edilen iki false-positive'i (deterministik bağlamın echo'sunun
+"desteklenmeyen" sayılması, entity adı yeniden biçimlendirmesi) katmanlı, sayısal kontrolü
+gevşetmeyen bir düzeltmeyle kapattı. Golden bir PaymentSync senaryosu (43 event/12 operasyon/7
+müşteri) gerçek Docker Compose'da uçtan uca (Resolve dahil) canlı doğrulandı.
+
+**Not: bu milestone'un kendi kaynağı (harici bir "M19" promptu), bir sonraki adımı "M20" olarak
+adlandırıyor — bu doküman ve `FI/README.md` bu numaralandırmayı benimsedi.** Önceki "M19 —
+Customer Validation" başlığı, aşağıda **M20** olarak yeniden adlandırıldı; kapsamı değişmedi.
+
+### M20 — Design Partner / Customer Validation
 
 İncelemenin önerdiği doğrudan uygulanabilir: en az 3 entegrasyon geliştiricisi, 2 support
-mühendisi, 1 otomasyon danışmanıyla M16 demo'sunu göster, tek soru sor: **"Bugün aynı problemi
-çözmek için hangi ekranlara bakıyorsunuz?"** Bu adım kod gerektirmez, planlama gerektirir.
+mühendisi, 1 otomasyon danışmanıyla M19'un golden incident demo'sunu göster, altı soru sor (bkz.
+`docs/product/M19_CLOSE_THE_PRODUCT_LOOP.md` sonundaki liste) — en önemlisi: **"Bugün aynı
+problemi çözmek için hangi ekranlara bakıyorsunuz?"** Bu adım kod gerektirmez, planlama
+gerektirir.
 
 ### Sonrasında — SaaS Roadmap
 
 İncelemenin "şimdilik yapma" listesi (multi-tenant, billing, teams, RBAC, marketplace,
-analytics) aynen korunmalı — ürün M19'da doğrulanmadan bunlara yatırım yapmak riskli.
+analytics) aynen korunmalı — ürün M20'de doğrulanmadan bunlara yatırım yapmak riskli.
 
 ## 4. GitHub Sunumu
 

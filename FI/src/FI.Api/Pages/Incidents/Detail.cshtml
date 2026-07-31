@@ -33,10 +33,51 @@
 </div>
 
 <div class="fi-section">
+    @if (Model.ResolvedAt is not null)
+    {
+        <div class="fi-card fi-resolved-card">
+            <div class="fi-eyebrow">Resolved</div>
+            <div class="fi-ai-row">
+                <div><strong>Resolved at</strong>@Model.ResolvedAt.Value.ToLocalTime().ToString("g")</div>
+                <div><strong>Resolved by</strong>@(string.IsNullOrWhiteSpace(Model.ResolvedBy) ? "—" : Model.ResolvedBy)</div>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(Model.ResolutionNote))
+            {
+                <div class="fi-resolution-note">@Model.ResolutionNote</div>
+            }
+        </div>
+    }
+    else if (Model.CanResolve)
+    {
+        <form method="post" asp-page-handler="Resolve" class="fi-resolve-form">
+            <input type="hidden" name="id" value="@Model.Id" />
+            <input type="text" name="ResolvedByInput" placeholder="Adınız (opsiyonel)" class="fi-resolve-input" />
+            <input type="text" name="ResolutionNoteInput" placeholder="Çözüm notu (opsiyonel)" class="fi-resolve-input fi-resolve-input-wide" />
+            <button type="submit" class="fi-btn-resolve">Resolve Incident</button>
+        </form>
+    }
+</div>
+
+<div class="fi-section">
     <h2>İş Etkisi</h2>
     <div class="fi-ai-row fi-card">
-        <div><strong>Etkilenen istek</strong>@Model.EventCount</div>
-        <div><strong>Etkilenen müşteri</strong>@(Model.AffectedCustomerCount is { } c ? c.ToString() : "bilinmiyor (provider bu veriyi taşımıyor)")</div>
+        <div><strong>Teknik event</strong>@Model.EventCount</div>
+        <div>
+            <strong>Bilinen operasyon</strong>
+            @(Model.KnownOperationCount is { } opCount ? opCount.ToString() : "bilinmiyor")
+            @if (Model.OperationCoverage == "Partial")
+            {
+                <div class="fi-coverage-note">Kısmi kapsam — bazı event'ler operasyon bilgisi taşımıyor</div>
+            }
+        </div>
+        <div>
+            <strong>Etkilenen müşteri</strong>
+            @(Model.AffectedCustomerCount is { } c ? c.ToString() : "bilinmiyor (provider bu veriyi taşımıyor)")
+            @if (Model.CustomerCoverage == "Partial")
+            {
+                <div class="fi-coverage-note">Kısmi kapsam</div>
+            }
+        </div>
         <div><strong>Süre</strong>@FormatDuration(Model.LastSeen - Model.FirstSeen)</div>
     </div>
 </div>
@@ -49,9 +90,10 @@
 @if (Model.LatestAnalysis is not null)
 {
     <div class="fi-section">
-        <h2>AI Analizi</h2>
+        <h2>AI-Assisted Analysis</h2>
         <div class="fi-card fi-ai-card">
             <p class="fi-ai-title">@Model.LatestAnalysis.Title</p>
+            <strong class="fi-eyebrow">Olası neden (AI destekli yorum, kesinleştirilmiş kanıt değil)</strong>
             <p>@Model.LatestAnalysis.ProbableRootCause</p>
             <div class="fi-ai-row">
                 <div>
@@ -84,7 +126,7 @@
 else
 {
     <div class="fi-section">
-        <h2>AI Analizi</h2>
+        <h2>AI-Assisted Analysis</h2>
         <div class="fi-empty">
             Henüz bir AI analizi yok — evidence toplanıyor veya evidence yetersiz olduğu için
             analiz atlandı (bkz. Bölüm 24.1: evidence yoksa AI çağrısı hiç yapılmaz).

@@ -13,9 +13,15 @@ namespace FI.Infrastructure.Connectors;
 /// Gerçek Stripe SDK'sı kullanılmaz; bu, demo/pilot senaryosu için Stripe'ın webhook zarfını
 /// ve imza şemasını (Stripe-Signature: t=...,v1=...) taklit eden bir mock'tur.
 /// Beklenen ham gövde şekli: { "type": "charge.failed", "httpStatusCode": 401,
-///   "data": { "object": { "id": "ch_123", "status": "failed", "customer": "cus_123" } },
+///   "data": { "object": { "id": "ch_123", "status": "failed", "customer": "cus_123",
+///     "metadata": { "operation_ref": "payment-sync-74921", "operation_type": "PaymentSync",
+///                   "business_record_ref": "subscription-18372" } } },
 ///   "error": { "code": "invalid_api_key" } }
 /// "customer" alanı opsiyoneldir - Bkz. docs/CTO_REVIEW_ANALYSIS.md M18 ("kaç müşteri etkilendi").
+/// "metadata.operation_ref"/"operation_type"/"business_record_ref" opsiyoneldir - Bkz.
+/// docs/product/M19_CLOSE_THE_PRODUCT_LOOP.md (P0-A, Business Operation Identity). Gerçek
+/// Stripe'ın "metadata" alanı arbitrary key-value çiftlerine izin verir - bu, o gerçek konvansiyonu
+/// taklit ediyor.
 /// </summary>
 public sealed class StripeConnector : IIntegrationConnector
 {
@@ -41,13 +47,25 @@ public sealed class StripeConnector : IIntegrationConnector
             : null;
 
         string? affectedCustomerRef = null;
+        string? operationRef = null;
+        string? operationType = null;
+        string? businessRecordRef = null;
         if (root.TryGetProperty("data", out var dataForCustomer) &&
-            dataForCustomer.TryGetProperty("object", out var objForCustomer) &&
-            objForCustomer.TryGetProperty("customer", out var customerEl) &&
-            customerEl.ValueKind == JsonValueKind.String &&
-            !string.IsNullOrWhiteSpace(customerEl.GetString()))
+            dataForCustomer.TryGetProperty("object", out var objForCustomer))
         {
-            affectedCustomerRef = customerEl.GetString();
+            if (objForCustomer.TryGetProperty("customer", out var customerEl) &&
+                customerEl.ValueKind == JsonValueKind.String &&
+                !string.IsNullOrWhiteSpace(customerEl.GetString()))
+            {
+                affectedCustomerRef = customerEl.GetString();
+            }
+
+            if (objForCustomer.TryGetProperty("metadata", out var metadataEl) && metadataEl.ValueKind == JsonValueKind.Object)
+            {
+                operationRef = ReadNonEmptyString(metadataEl, "operation_ref");
+                operationType = ReadNonEmptyString(metadataEl, "operation_type");
+                businessRecordRef = ReadNonEmptyString(metadataEl, "business_record_ref");
+            }
         }
 
         var requestJson = JsonSerializer.Serialize(new
@@ -73,8 +91,16 @@ public sealed class StripeConnector : IIntegrationConnector
             LatencyMs: null,
             OccurredAt: DateTimeOffset.UtcNow,
             ProviderEventId: providerEventId,
-            AffectedCustomerRef: affectedCustomerRef);
+            AffectedCustomerRef: affectedCustomerRef,
+            OperationRef: operationRef,
+            OperationType: operationType,
+            BusinessRecordRef: businessRecordRef);
     }
+
+    private static string? ReadNonEmptyString(JsonElement obj, string propertyName) =>
+        obj.TryGetProperty(propertyName, out var el) && el.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(el.GetString())
+            ? el.GetString()
+            : null;
 
     /// <summary>
     /// Stripe-Signature: t={unixTimestamp},v1={hmac}. HMAC-SHA256("{t}.{rawBody}", secret).

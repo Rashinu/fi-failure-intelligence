@@ -344,6 +344,55 @@ a:hover { color: var(--fi-accent-strong); text-decoration: underline; }
 .fi-actions-list { margin: 0; padding-left: 18px; font-size: 0.9rem; }
 .fi-actions-list li { margin-bottom: 4px; }
 
+.fi-coverage-note {
+    font-size: 0.72rem;
+    color: var(--fi-medium);
+    font-weight: 500;
+    margin-top: 4px;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.fi-resolved-card { border-color: rgba(95,219,163,0.35); background: rgba(95,219,163,0.06); }
+.fi-resolved-card .fi-eyebrow { color: var(--fi-low); }
+.fi-resolution-note { margin-top: 10px; font-size: 0.9rem; color: var(--fi-text); }
+
+.fi-resolve-form {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    background: var(--fi-surface);
+    border: 1px solid var(--fi-border);
+    border-radius: var(--fi-radius);
+    padding: 14px 16px;
+}
+.fi-resolve-input {
+    background: var(--fi-surface-2);
+    border: 1px solid var(--fi-border);
+    color: var(--fi-text);
+    padding: 8px 12px;
+    border-radius: var(--fi-radius-sm);
+    font-size: 0.86rem;
+    font-family: inherit;
+    flex: 1;
+    min-width: 140px;
+}
+.fi-resolve-input-wide { flex: 2; min-width: 220px; }
+.fi-btn-resolve {
+    background: var(--fi-accent);
+    color: #fff;
+    border: none;
+    padding: 9px 18px;
+    border-radius: var(--fi-radius-sm);
+    font-size: 0.86rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+.fi-btn-resolve:hover { background: var(--fi-accent-strong); }
+
 .fi-timeline { border-left: 2px solid var(--fi-border); padding-left: 20px; margin-left: 5px; }
 .fi-timeline-item { position: relative; padding-bottom: 20px; font-size: 0.88rem; }
 .fi-timeline-item::before {

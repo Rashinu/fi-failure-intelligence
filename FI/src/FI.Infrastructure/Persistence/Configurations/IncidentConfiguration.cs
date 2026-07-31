@@ -28,6 +28,8 @@ public class IncidentConfiguration : IEntityTypeConfiguration<Incident>
         builder.Property(i => i.ReopenCount).HasColumnName("reopen_count").IsRequired();
         builder.Property(i => i.ResolutionSource).HasColumnName("resolution_source").HasMaxLength(30);
         builder.Property(i => i.ResolvedAt).HasColumnName("resolved_at");
+        builder.Property(i => i.ResolvedBy).HasColumnName("resolved_by").HasMaxLength(200);
+        builder.Property(i => i.ResolutionNote).HasColumnName("resolution_note").HasMaxLength(2000);
         builder.Property(i => i.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(i => i.UpdatedAt).HasColumnName("updated_at").IsRequired();
 

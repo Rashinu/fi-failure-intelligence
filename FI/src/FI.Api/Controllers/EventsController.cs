@@ -94,7 +94,10 @@ public class EventsController : ControllerBase
             payloadSizeBytes: totalBytes,
             isTruncated: isTruncated,
             occurredAt: request.OccurredAt,
-            affectedCustomerRef: request.CustomerRef);
+            affectedCustomerRef: request.CustomerRef,
+            operationRef: request.OperationRef,
+            operationType: request.OperationType,
+            businessRecordRef: request.BusinessRecordRef);
 
         _db.IntegrationEvents.Add(integrationEvent);
 

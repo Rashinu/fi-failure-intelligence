@@ -50,5 +50,20 @@ public sealed record IncidentDetailResponse(
     string Fingerprint,
     string SuggestedAction,
     int? AffectedCustomerCount,
+    string CustomerCoverage,
+    int? KnownOperationCount,
+    string OperationCoverage,
+    ResolutionResponse? Resolution,
     IReadOnlyList<IncidentEvidenceResponse> Evidence,
     AiAnalysisResponse? LatestAnalysis);
+
+/// <summary>
+/// Bkz. docs/product/M19_CLOSE_THE_PRODUCT_LOOP.md P0-B. Yalnızca incident Resolved durumundayken
+/// dolu döner (null = henüz resolve edilmemiş).
+/// </summary>
+public sealed record ResolutionResponse(
+    DateTimeOffset ResolvedAt,
+    string? ResolvedBy,
+    string? ResolutionNote);
+
+public sealed record ResolveIncidentRequest(string? ResolvedBy, string? Note);

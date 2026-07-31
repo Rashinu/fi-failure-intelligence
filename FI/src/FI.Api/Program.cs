@@ -65,6 +65,12 @@ if (args.Contains("--migrate"))
     var db = scope.ServiceProvider.GetRequiredService<FiDbContext>();
     await db.Database.MigrateAsync();
 
+    // Bkz. docs/product/M19_CLOSE_THE_PRODUCT_LOOP.md - "Aktif Prompt Kalitesi". Bu, kasıtlı bir
+    // bootstrap istisnası - PromptVersion.CreateActive'in kendi XML doc'unda belgelendiği gibi,
+    // PromptPromotionGate'i yalnızca bu TEK, hiç ACTIVE versiyon yokken çalışan koşulda atlar.
+    // Bootstrap sonrası herhangi bir gerçek prompt güncellemesi CreateDraft + gerçek bir
+    // PromptVersionsController.Promote (golden dataset gate) akışından geçmelidir - burada bir
+    // sahte eval skoru asla üretilmez (EvalOverallAverage/EvaluatedAt bilerek null bırakılır).
     if (!db.PromptVersions.Any(p => p.Status == PromptVersionStatus.Active))
     {
         db.PromptVersions.Add(PromptVersion.CreateActive(PromptTemplates.RootCauseV1Label, PromptTemplates.RootCauseV1SystemPrompt));

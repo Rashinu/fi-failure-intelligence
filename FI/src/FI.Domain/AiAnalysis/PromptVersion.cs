@@ -21,6 +21,16 @@ public class PromptVersion
 
     private PromptVersion() { }
 
+    /// <summary>
+    /// Bkz. docs/product/M19_CLOSE_THE_PRODUCT_LOOP.md - "Aktif Prompt Kalitesi". YALNIZCA
+    /// sistemin bootstrap seed'i içindir (bkz. Program.cs'in "--migrate" modu, yalnızca hiç
+    /// ACTIVE versiyon yokken çağrılır) - <see cref="PromptPromotionGate"/>'i BİLEREK atlar,
+    /// çünkü sistemin bir yerden başlaması gerekir ve henüz karşılaştırılacak bir baseline yok.
+    /// Bu, bir gate-bypass HATASI DEĞİL, dokümante edilmiş, kasıtlı bir istisna - ama bu yüzden
+    /// EvalOverallAverage/EvaluatedAt asla set edilmez (null kalır), sahte bir kalite skoru
+    /// üretilmez. Bootstrap sonrası TÜM versiyonlar <see cref="CreateDraft"/> + gerçek bir
+    /// <see cref="PromptPromotionGate"/> onayından geçmelidir.
+    /// </summary>
     public static PromptVersion CreateActive(string versionLabel, string systemPromptTemplate)
     {
         if (string.IsNullOrWhiteSpace(versionLabel)) throw new ArgumentException("VersionLabel zorunludur.", nameof(versionLabel));

@@ -9,6 +9,16 @@ namespace FI.Domain.AiAnalysis;
 /// Confidence esigi ve grounding kontrolu kaydi REDDETMEZ - yalnizca needsHumanReview'i zorlar
 /// (Bolum 26.2 madde 3-4: "needsHumanReview sistem tarafindan zorla true" - kayit yine olusur).
 /// Bu kontrol KESIN DEGILDIR (basit substring/kelime-ortusme seviyesinde, MVP kapsami).
+///
+/// Bkz. docs/product/M19_CLOSE_THE_PRODUCT_LOOP.md P0-C - CheckGrounding'in gerçek Claude
+/// Haiku'ya karşı 0.100 skorlamasının teşhisi, gerçek testlerle (bkz. AiAnalysisValidatorTests)
+/// İKİ somut false-positive kaynağı ortaya çıkardı: (1) modelin, KENDİSİNE zaten verilmiş
+/// deterministik bağlamı (kategori adı, entegrasyon adı) doğru şekilde tekrar etmesi bile
+/// "desteklenmeyen iddia" sayılıyordu - çünkü bu alanlar evidence metninde DEĞİL, deterministik
+/// input'ta yaşıyordu ve kontrol yalnızca evidence'a bakıyordu; (2) bir entity adının noktalama/
+/// boşluk farkıyla yeniden biçimlendirilmesi ("Stripe Payments (Prod)" vs "StripePaymentsProd")
+/// birebir substring eşleşmesini bozuyordu. Sayısal iddialar (uydurulmuş rakamlar) İSE zaten
+/// doğru yakalanıyordu - bu katmana KASITLI OLARAK dokunulmadı (gevşetilmedi).
 /// </summary>
 public static class AiAnalysisValidator
 {
@@ -18,6 +28,7 @@ public static class AiAnalysisValidator
     private static readonly Regex NumberTokenRegex = new(@"\b\d{2,}\b", RegexOptions.Compiled);
     private static readonly Regex EntityLikeTokenRegex = new(@"\b[A-Z][a-zA-Z0-9_]{3,}\b", RegexOptions.Compiled);
     private static readonly Regex MarkdownFenceRegex = new(@"^```(?:json)?\s*|\s*```$", RegexOptions.Compiled | RegexOptions.Multiline);
+    private static readonly Regex NonAlphanumericRegex = new(@"[^a-zA-Z0-9]", RegexOptions.Compiled);
 
     public static (AiAnalysisValidationResult Result, AiAnalysisOutput? Output) Validate(
         string? rawResponseText,
@@ -67,7 +78,7 @@ public static class AiAnalysisValidator
             return (Rejected(AiAnalysisRejectionReason.SchemaEchoMismatch), output);
 
         var confidence = output.Confidence.Value;
-        var (outOfEvidence, flaggedClaims) = CheckGrounding(output, evidence);
+        var (outOfEvidence, flaggedClaims) = CheckGrounding(output, expected, evidence);
 
         var needsHumanReview = output.NeedsHumanReview.Value;
         if (confidence < ConfidenceRejectThreshold) needsHumanReview = true;
@@ -78,9 +89,22 @@ public static class AiAnalysisValidator
     }
 
     private static (bool OutOfEvidence, IReadOnlyList<string> FlaggedClaims) CheckGrounding(
-        AiAnalysisOutput output, IReadOnlyList<EvidenceInput> evidence)
+        AiAnalysisOutput output, DeterministicClassificationInput expected, IReadOnlyList<EvidenceInput> evidence)
     {
-        var corpus = string.Join(" ", evidence.Select(e => e.Summary));
+        // Katman 1 (mevcut): evidence özetleri - toplanan GERÇEK kanıt.
+        // Katman 2 (M19 P0-C düzeltmesi): deterministik sınıflandırma bağlamı da corpus'a dahil -
+        // modelin zaten kendisine verilmiş kategori/entegrasyon adını doğru şekilde tekrar etmesi
+        // bir "iddia" değil, echo edilen bilinen bir gerçek; bunu "desteklenmeyen" saymak yanlıştı.
+        var corpus = string.Join(" ", evidence.Select(e => e.Summary)
+            .Append(expected.Category)
+            .Append(expected.AffectedIntegration)
+            .Append(expected.Severity));
+        // Katman 3 (M19 P0-C düzeltmesi): karşılaştırma öncesi noktalama/boşluk normalize edilir -
+        // "Stripe Payments (Prod)" ile "StripePaymentsProd" aynı normalize edilmiş forma indirgenir.
+        // Bu SAYISAL kontrolü gevşetmiyor (rakamlar zaten noktalamasız) - yalnızca entity-adı
+        // yeniden biçimlendirmelerini (paraphrase) doğru tanıyor.
+        var normalizedCorpus = Normalize(corpus);
+
         var candidateText = output.ProbableRootCause ?? string.Empty;
 
         var tokens = NumberTokenRegex.Matches(candidateText).Select(m => m.Value)
@@ -89,11 +113,13 @@ public static class AiAnalysisValidator
             .ToList();
 
         var flagged = tokens
-            .Where(t => !corpus.Contains(t, StringComparison.OrdinalIgnoreCase))
+            .Where(t => !normalizedCorpus.Contains(Normalize(t), StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         return (flagged.Count > 0, flagged);
     }
+
+    private static string Normalize(string text) => NonAlphanumericRegex.Replace(text, "");
 
     private static AiAnalysisValidationResult Rejected(AiAnalysisRejectionReason reason) =>
         new(false, reason, true, false, Array.Empty<string>());

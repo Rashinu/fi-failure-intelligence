@@ -24,6 +24,23 @@ public class PromptVersionTests
         version.RolloutPercentage.Should().Be(100);
     }
 
+    /// <summary>
+    /// Bkz. docs/product/M19_CLOSE_THE_PRODUCT_LOOP.md - "Aktif Prompt Kalitesi" bölümü.
+    /// CreateActive, PromptPromotionGate'i BİLEREK atlıyor (yalnızca ilk bootstrap seed'i için,
+    /// bkz. Program.cs) - bu yüzden hiçbir zaman sahte bir eval skoru üretmemeli.
+    /// EvalOverallAverage/EvaluatedAt null kalmalı; API/UI bunu "hiç değerlendirilmedi" olarak
+    /// dürüstçe gösterir, uydurulmuş bir 0.85+ skor değil.
+    /// </summary>
+    [Fact]
+    public void CreateActive_NeverFakesAnEvalScore()
+    {
+        var version = PromptVersion.CreateActive("fi-root-cause-v1", "system prompt text");
+
+        version.EvalOverallAverage.Should().BeNull();
+        version.EvalPerDimensionJson.Should().BeNull();
+        version.EvaluatedAt.Should().BeNull();
+    }
+
     [Fact]
     public void RecordEvalResult_SetsOverallAverageAndTimestamp()
     {

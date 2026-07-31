@@ -48,6 +48,24 @@ public class IntegrationEvent
     /// </summary>
     public Guid? IncidentId { get; private set; }
 
+    /// <summary>
+    /// Bkz. docs/product/M19_CLOSE_THE_PRODUCT_LOOP.md - P0-A (Business Operation Identity).
+    /// FI önceden yalnızca IntegrationEvent → Incident modelliyordu; ama ürün sorusu "kaç teknik
+    /// event" değil "kaç iş operasyonu" idi. Bir tekil PaymentSync operasyonu (retry + webhook
+    /// callback dahil) birden fazla teknik event üretebilir - bunlar hâlâ TEK bir başarısız iş
+    /// operasyonunu temsil eder. Opsiyoneldir - her provider/event bunu taşımaz; null "bilinmiyor"
+    /// anlamına gelir, "sıfır operasyon" değil (bkz. IncidentsController'daki OperationCoverage).
+    /// </summary>
+    public string? OperationRef { get; private set; }
+
+    /// <summary>İş operasyonunun türü (ör. "PaymentSync"). Yalnızca görüntüleme amaçlı; sayım
+    /// mantığı yalnızca <see cref="OperationRef"/>'e dayanır.</summary>
+    public string? OperationType { get; private set; }
+
+    /// <summary>İlişkili iş kaydının opak referansı (ör. "subscription-18372"). AffectedCustomerRef
+    /// gibi PII değildir, redaction kapsamı dışındadır.</summary>
+    public string? BusinessRecordRef { get; private set; }
+
     private IntegrationEvent() { }
 
     public static IntegrationEvent Create(
@@ -64,7 +82,10 @@ public class IntegrationEvent
         int payloadSizeBytes,
         bool isTruncated,
         DateTimeOffset occurredAt,
-        string? affectedCustomerRef = null)
+        string? affectedCustomerRef = null,
+        string? operationRef = null,
+        string? operationType = null,
+        string? businessRecordRef = null)
     {
         if (statusCode is < 100 or > 599)
             throw new ArgumentOutOfRangeException(nameof(statusCode), "statusCode 100-599 aralığında olmalıdır.");
@@ -86,7 +107,10 @@ public class IntegrationEvent
             IsTruncated = isTruncated,
             OccurredAt = occurredAt,
             ReceivedAt = DateTimeOffset.UtcNow,
-            AffectedCustomerRef = affectedCustomerRef
+            AffectedCustomerRef = affectedCustomerRef,
+            OperationRef = operationRef,
+            OperationType = operationType,
+            BusinessRecordRef = businessRecordRef
         };
     }
 

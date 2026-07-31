@@ -40,10 +40,10 @@ public class ClassificationToIncidentTests : IClassFixture<FiApiFactory>
         return (created!.IntegrationId, created.ApiKey);
     }
 
-    private async Task<Guid> IngestEventAsync(HttpClient client, string apiKey, Guid integrationId, int statusCode, object? response = null, string? customerRef = null)
+    private async Task<Guid> IngestEventAsync(HttpClient client, string apiKey, Guid integrationId, int statusCode, object? response = null, string? customerRef = null, string? operationRef = null)
     {
         var ingestResponse = await client.PostAsJsonAsync("/api/v1/events",
-            new IngestEventRequest(integrationId, "ApiCall", statusCode, null, response, 100, DateTimeOffset.UtcNow, customerRef));
+            new IngestEventRequest(integrationId, "ApiCall", statusCode, null, response, 100, DateTimeOffset.UtcNow, customerRef, operationRef, operationRef is null ? null : "PaymentSync"));
         ingestResponse.EnsureSuccessStatusCode();
         var body = await ingestResponse.Content.ReadFromJsonAsync<IngestEventResponse>();
         return body!.EventId;
@@ -133,6 +133,86 @@ public class ClassificationToIncidentTests : IClassFixture<FiApiFactory>
         var body = await response.Content.ReadFromJsonAsync<FI.Application.Incidents.IncidentDetailResponse>();
 
         body!.AffectedCustomerCount.Should().Be(2);
+    }
+
+    /// <summary>
+    /// M19 P0-A doğrulaması (bkz. docs/product/M19_CLOSE_THE_PRODUCT_LOOP.md, Preflight Constraint
+    /// 1): 5 event'ten yalnızca 3'ü OperationRef taşıyorsa, KnownOperationCount TOPLAM etki gibi
+    /// sunulamaz - "Partial" coverage ile birlikte yalnızca bilinen alt küme (2 distinct operasyon)
+    /// dönmeli.
+    /// </summary>
+    [Fact]
+    public async Task OperationCoverage_WhenSomeEventsLackOperationRef_ReportsPartial()
+    {
+        var client = _factory.CreateClient();
+        var (integrationId, apiKey) = await CreateIntegrationAsync(client);
+        client.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
+
+        var e1 = await IngestEventAsync(client, apiKey, integrationId, 401, operationRef: "payment-sync-1");
+        await RunClassifyAsync(e1, Guid.NewGuid());
+        var e2 = await IngestEventAsync(client, apiKey, integrationId, 401, operationRef: "payment-sync-1");
+        await RunClassifyAsync(e2, Guid.NewGuid());
+        var e3 = await IngestEventAsync(client, apiKey, integrationId, 401, operationRef: "payment-sync-2");
+        await RunClassifyAsync(e3, Guid.NewGuid());
+        var e4 = await IngestEventAsync(client, apiKey, integrationId, 401); // no operationRef
+        await RunClassifyAsync(e4, Guid.NewGuid());
+        var e5 = await IngestEventAsync(client, apiKey, integrationId, 401); // no operationRef
+        await RunClassifyAsync(e5, Guid.NewGuid());
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<FiDbContext>();
+        var incident = await db.Incidents.SingleAsync(i => i.IntegrationId == integrationId);
+
+        var response = await client.GetAsync($"/api/v1/incidents/{incident.Id}");
+        var body = await response.Content.ReadFromJsonAsync<FI.Application.Incidents.IncidentDetailResponse>();
+
+        body!.EventCount.Should().Be(5);
+        body.KnownOperationCount.Should().Be(2, "yalnızca 2 distinct OperationRef biliniyor (payment-sync-1, payment-sync-2)");
+        body.OperationCoverage.Should().Be("Partial");
+    }
+
+    [Fact]
+    public async Task OperationCoverage_WhenNoEventsHaveOperationRef_ReportsNoneAndNullCount()
+    {
+        var client = _factory.CreateClient();
+        var (integrationId, apiKey) = await CreateIntegrationAsync(client);
+        client.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
+
+        var e1 = await IngestEventAsync(client, apiKey, integrationId, 401);
+        await RunClassifyAsync(e1, Guid.NewGuid());
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<FiDbContext>();
+        var incident = await db.Incidents.SingleAsync(i => i.IntegrationId == integrationId);
+
+        var response = await client.GetAsync($"/api/v1/incidents/{incident.Id}");
+        var body = await response.Content.ReadFromJsonAsync<FI.Application.Incidents.IncidentDetailResponse>();
+
+        body!.KnownOperationCount.Should().BeNull("hiçbir event OperationRef taşımıyorsa 'bilinmiyor' anlamına gelmeli, 'sıfır' değil");
+        body.OperationCoverage.Should().Be("None");
+    }
+
+    [Fact]
+    public async Task OperationCoverage_WhenAllEventsHaveOperationRef_ReportsComplete()
+    {
+        var client = _factory.CreateClient();
+        var (integrationId, apiKey) = await CreateIntegrationAsync(client);
+        client.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
+
+        var e1 = await IngestEventAsync(client, apiKey, integrationId, 401, operationRef: "payment-sync-1");
+        await RunClassifyAsync(e1, Guid.NewGuid());
+        var e2 = await IngestEventAsync(client, apiKey, integrationId, 401, operationRef: "payment-sync-2");
+        await RunClassifyAsync(e2, Guid.NewGuid());
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<FiDbContext>();
+        var incident = await db.Incidents.SingleAsync(i => i.IntegrationId == integrationId);
+
+        var response = await client.GetAsync($"/api/v1/incidents/{incident.Id}");
+        var body = await response.Content.ReadFromJsonAsync<FI.Application.Incidents.IncidentDetailResponse>();
+
+        body!.KnownOperationCount.Should().Be(2);
+        body.OperationCoverage.Should().Be("Complete");
     }
 
     [Fact]

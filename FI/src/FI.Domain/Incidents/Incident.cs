@@ -25,6 +25,17 @@ public class Incident
     public int ReopenCount { get; private set; }
     public string? ResolutionSource { get; private set; }
     public DateTimeOffset? ResolvedAt { get; private set; }
+
+    /// <summary>
+    /// Bkz. docs/product/M19_CLOSE_THE_PRODUCT_LOOP.md P0-B. <see cref="ResolutionSource"/>'dan
+    /// KASITLI olarak ayrı - o, mimari dokümanda zaten tanımlı kategorik bir alan
+    /// (HUMAN_MANUAL | AUTO_SILENCE | AI_APPROVED, varchar(30)), "kim/neden" değil "hangi
+    /// mekanizma" sorusuna cevap verir. ResolvedBy (serbest metin aktör etiketi) ve
+    /// ResolutionNote (serbest metin not) burada YENİ, ayrı kavramlardır.
+    /// </summary>
+    public string? ResolvedBy { get; private set; }
+    public string? ResolutionNote { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -67,6 +78,11 @@ public class Incident
         if (occurredAt > LastSeen) LastSeen = occurredAt;
         Severity = recalculatedSeverity;
         ResolvedAt = null;
+        // Bkz. M19 P0-B - bir önceki resolve'un "kim/not"u, reopen sonrası artık geçerli değil;
+        // ResolvedAt ile aynı anda temizlenir (ResolutionSource kategorik alanı, önceden de
+        // Reopen'da temizlenmediği için burada da dokunulmadı - mevcut davranış korunuyor).
+        ResolvedBy = null;
+        ResolutionNote = null;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
@@ -86,6 +102,33 @@ public class Incident
         EventCount = 1;
         Severity = recalculatedSeverity;
         ResolvedAt = null;
+        ResolvedBy = null;
+        ResolutionNote = null;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>
+    /// Bkz. docs/product/M19_CLOSE_THE_PRODUCT_LOOP.md P0-B - Resolved durumu artık gerçekten
+    /// ulaşılabilir; önceden IncidentStatus.Resolved hiçbir kod yolunda set edilmiyordu. Yalnızca
+    /// aktif (<see cref="IsActive"/>) bir incident resolve edilebilir - zaten Resolved veya Ignored
+    /// bir incident'ı tekrar resolve etmeye çalışmak geçersiz bir geçiş sayılır (çağıran katman,
+    /// ör. API'de bunu 409 Conflict'e çevirir). <see cref="Reopen"/> zaten ResolvedAt'i null'a
+    /// çekiyor ve <see cref="IsWithinReopenCooldown"/> ResolvedAt'e bakıyor - yani 14:20'de resolve
+    /// edilip 14:22'de eşleşen bir failure gelirse, ClassifyJobHandler'ın MEVCUT
+    /// existingIncident.IsWithinReopenCooldown(now) dalı otomatik olarak Reopen()'a yönlendirir;
+    /// burada paralel bir recovery lifecycle icat edilmedi, mevcut aggregate state machine tek
+    /// gerçek kaynak olarak kaldı.
+    /// </summary>
+    public void Resolve(string? resolvedBy, string? resolutionNote)
+    {
+        if (!IsActive)
+            throw new InvalidOperationException($"'{Status}' durumundaki bir incident resolve edilemez.");
+
+        Status = IncidentStatus.Resolved;
+        ResolvedAt = DateTimeOffset.UtcNow;
+        ResolutionSource = "HUMAN_MANUAL";
+        ResolvedBy = resolvedBy;
+        ResolutionNote = resolutionNote;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 

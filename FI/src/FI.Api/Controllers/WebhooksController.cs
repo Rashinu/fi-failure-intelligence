@@ -68,7 +68,10 @@ public class WebhooksController : ControllerBase
             payloadSizeBytes: Encoding.UTF8.GetByteCount(payload.RawBody),
             isTruncated: false,
             occurredAt: normalized.OccurredAt,
-            affectedCustomerRef: normalized.AffectedCustomerRef);
+            affectedCustomerRef: normalized.AffectedCustomerRef,
+            operationRef: normalized.OperationRef,
+            operationType: normalized.OperationType,
+            businessRecordRef: normalized.BusinessRecordRef);
 
         if (normalized.ProviderEventId is not null)
         {

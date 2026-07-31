@@ -1,6 +1,9 @@
 using System.Text.Json;
+using FI.Api.Middleware;
 using FI.Application.Incidents;
+using FI.Domain.Audit;
 using FI.Domain.Classification;
+using FI.Domain.Incidents;
 using FI.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -85,19 +88,34 @@ public class IncidentsController : ControllerBase
             .Where(a => a.IncidentId == id && a.IsLatest)
             .FirstOrDefaultAsync(cancellationToken);
 
-        // Bkz. docs/CTO_REVIEW_ANALYSIS.md M18/TD3 - "kac musteri etkilendi". Onceden burada
-        // dogrudan bir FK olmadigi icin IntegrationId+Category-string+zaman-penceresi (+ D2'nin
-        // 15-dakikalik payi) ile yeniden turetiliyordu; artik ClassifyJobHandler'in sinif
-        // landirma aninda set ettigi gercek IncidentId FK'sina (bkz. IntegrationEvent.IncidentId)
-        // gore dogrudan filtreleniyor - zaman penceresi tahmini yok, kayip yok. Hicbir event
-        // customer ref tasimiyorsa (provider desteklemiyorsa) null donulur - "0 musteri" ile
-        // "bu veri hic yok" birbirinden ayirt edilir.
-        var distinctCustomerRefs = await _db.IntegrationEvents.AsNoTracking()
-            .Where(e => e.IncidentId == incident.Id && e.AffectedCustomerRef != null)
-            .Select(e => e.AffectedCustomerRef)
-            .Distinct()
-            .CountAsync(cancellationToken);
-        int? affectedCustomerCount = distinctCustomerRefs > 0 ? distinctCustomerRefs : null;
+        // Bkz. docs/product/M19_CLOSE_THE_PRODUCT_LOOP.md P0-A - "kac musteri/operasyon etkilendi"
+        // ve "operation coverage" tek bir gruplu sorguda hesaplanir (IncidentId FK'sina gore,
+        // bkz. TD3 - zaman penceresi tahmini yok). Hem musteri hem operasyon icin ayni durustluk
+        // ilkesi uygulanir: hicbir event alani tasimiyorsa null/"None" donulur ("bilinmiyor"),
+        // "sifir" degil; yalnizca BAZI event'ler alani tasiyorsa "Partial" - bilinen sayi TOPLAM
+        // etki degil, bilinen alt kumedir.
+        var impact = await _db.IntegrationEvents.AsNoTracking()
+            .Where(e => e.IncidentId == incident.Id)
+            .GroupBy(e => 1)
+            .Select(g => new
+            {
+                TotalEvents = g.Count(),
+                EventsWithCustomer = g.Count(e => e.AffectedCustomerRef != null),
+                DistinctCustomers = g.Select(e => e.AffectedCustomerRef).Where(r => r != null).Distinct().Count(),
+                EventsWithOperation = g.Count(e => e.OperationRef != null),
+                DistinctOperations = g.Select(e => e.OperationRef).Where(r => r != null).Distinct().Count()
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var totalEvents = impact?.TotalEvents ?? 0;
+        var customerCoverage = ComputeCoverage(totalEvents, impact?.EventsWithCustomer ?? 0);
+        int? affectedCustomerCount = customerCoverage == "None" ? null : impact!.DistinctCustomers;
+        var operationCoverage = ComputeCoverage(totalEvents, impact?.EventsWithOperation ?? 0);
+        int? knownOperationCount = operationCoverage == "None" ? null : impact!.DistinctOperations;
+
+        ResolutionResponse? resolution = incident.ResolvedAt is null
+            ? null
+            : new ResolutionResponse(incident.ResolvedAt.Value, incident.ResolvedBy, incident.ResolutionNote);
 
         AiAnalysisResponse? latestAnalysis = latestAnalysisEntity is null ? null : new AiAnalysisResponse(
             latestAnalysisEntity.Id,
@@ -124,7 +142,41 @@ public class IncidentsController : ControllerBase
             incident.Fingerprint,
             SuggestedActionCatalog.For(incident.Category),
             affectedCustomerCount,
+            customerCoverage,
+            knownOperationCount,
+            operationCoverage,
+            resolution,
             evidence,
             latestAnalysis));
     }
+
+    /// <summary>Bkz. docs/product/M19_CLOSE_THE_PRODUCT_LOOP.md P0-B.</summary>
+    [HttpPost("{id:guid}/resolve")]
+    public async Task<ActionResult<IncidentDetailResponse>> Resolve(Guid id, [FromBody] ResolveIncidentRequest? request, CancellationToken cancellationToken)
+    {
+        var incident = await _db.Incidents.FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
+        if (incident is null) return NotFound();
+
+        try
+        {
+            incident.Resolve(request?.ResolvedBy, request?.Note);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+
+        _db.AuditLogs.Add(AuditLog.Create(
+            AuditActorType.User, request?.ResolvedBy, AuditActions.IncidentResolved, AuditEntityTypes.Incident,
+            incident.Id, HttpContext.GetCorrelationId(),
+            changes: JsonSerializer.Serialize(new { note = request?.Note })));
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return await GetById(id, cancellationToken);
+    }
+
+    private static string ComputeCoverage(int totalEvents, int eventsWithField) =>
+        eventsWithField == 0 ? "None" :
+        eventsWithField == totalEvents ? "Complete" : "Partial";
 }

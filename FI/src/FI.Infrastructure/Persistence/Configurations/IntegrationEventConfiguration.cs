@@ -32,9 +32,20 @@ public class IntegrationEventConfiguration : IEntityTypeConfiguration<Integratio
         builder.Property(e => e.ReceivedAt).HasColumnName("received_at").IsRequired();
         builder.Property(e => e.AffectedCustomerRef).HasColumnName("affected_customer_ref").HasMaxLength(200);
         builder.Property(e => e.IncidentId).HasColumnName("incident_id");
+        builder.Property(e => e.OperationRef).HasColumnName("operation_ref").HasMaxLength(200);
+        builder.Property(e => e.OperationType).HasColumnName("operation_type").HasMaxLength(100);
+        builder.Property(e => e.BusinessRecordRef).HasColumnName("business_record_ref").HasMaxLength(200);
 
         builder.HasIndex(e => new { e.IntegrationId, e.OccurredAt });
         builder.HasIndex(e => e.CorrelationId);
+        // Bkz. docs/product/M19_CLOSE_THE_PRODUCT_LOOP.md - Index Kararı: OperationRef için AYRI
+        // bir index EKLENMEDİ. Ana projeksiyon sorgusu "WHERE incident_id = ? SELECT DISTINCT
+        // operation_ref" şeklinde - IncidentId zaten indeksli ve son derece seçici (bir incident'a
+        // ait event sayısı tipik olarak birkaç düzine ile birkaç yüz arasında, bir tablo taraması
+        // gerektirmeyen küçük bir satır kümesi). Bu ölçekte composite bir (IncidentId, OperationRef)
+        // index'inin sorgu tarafında kazandıracağı şey marjinal - ama her ClassifyJobHandler
+        // event-incident ataması (UPDATE) için ek yazma maliyeti kesin. IncidentId'nin kendi
+        // index'i yeniden kullanılıyor; ayrı bir index EKLENMEDİ.
         builder.HasIndex(e => e.IncidentId);
 
         builder.HasOne<Integration>().WithMany().HasForeignKey(e => e.IntegrationId).OnDelete(DeleteBehavior.Cascade);

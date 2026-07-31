@@ -76,4 +76,33 @@ public class IntegrationEventTests
 
         evt.IncidentId.Should().Be(incidentId);
     }
+
+    // --- M19 P0-A: Business Operation Identity (bkz. docs/product/M19_CLOSE_THE_PRODUCT_LOOP.md) ---
+
+    [Fact]
+    public void Create_WithoutOperationFields_DefaultToNull()
+    {
+        var evt = IntegrationEvent.Create(
+            Guid.NewGuid(), IntegrationEventType.ApiCall, 401, null, null, null,
+            Guid.NewGuid(), null, null, null, 0, false, DateTimeOffset.UtcNow);
+
+        evt.OperationRef.Should().BeNull();
+        evt.OperationType.Should().BeNull();
+        evt.BusinessRecordRef.Should().BeNull();
+    }
+
+    [Fact]
+    public void Create_WithOperationFields_SetsThem()
+    {
+        var evt = IntegrationEvent.Create(
+            Guid.NewGuid(), IntegrationEventType.WebhookIn, 401, null, null, null,
+            Guid.NewGuid(), null, null, null, 0, false, DateTimeOffset.UtcNow,
+            operationRef: "payment-sync-74921",
+            operationType: "PaymentSync",
+            businessRecordRef: "subscription-18372");
+
+        evt.OperationRef.Should().Be("payment-sync-74921");
+        evt.OperationType.Should().Be("PaymentSync");
+        evt.BusinessRecordRef.Should().Be("subscription-18372");
+    }
 }

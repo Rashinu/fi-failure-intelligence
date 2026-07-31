@@ -1,4 +1,6 @@
 using System.Text.Json;
+using FI.Api.Middleware;
+using FI.Domain.Audit;
 using FI.Domain.Classification;
 using FI.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
@@ -29,9 +31,22 @@ public class DetailModel : PageModel
     public string Fingerprint { get; private set; } = "";
     public string SuggestedAction { get; private set; } = "";
     public int? AffectedCustomerCount { get; private set; }
+    public string CustomerCoverage { get; private set; } = "None";
+    public int? KnownOperationCount { get; private set; }
+    public string OperationCoverage { get; private set; } = "None";
+    public bool CanResolve { get; private set; }
+    public DateTimeOffset? ResolvedAt { get; private set; }
+    public string? ResolvedBy { get; private set; }
+    public string? ResolutionNote { get; private set; }
     public List<EvidenceRow> Evidence { get; private set; } = new();
     public AiAnalysisRow? LatestAnalysis { get; private set; }
     public List<TimelineEntry> Timeline { get; private set; } = new();
+
+    [BindProperty]
+    public string? ResolvedByInput { get; set; }
+
+    [BindProperty]
+    public string? ResolutionNoteInput { get; set; }
 
     public async Task<IActionResult> OnGetAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -49,13 +64,20 @@ public class DetailModel : PageModel
             .Where(a => a.IncidentId == id && a.IsLatest)
             .FirstOrDefaultAsync(cancellationToken);
 
-        // Bkz. IncidentsController.GetById / TD3 - gercek IncidentId FK'sina gore filtreleniyor,
-        // zaman-penceresi tahmini yok.
-        var distinctCustomerRefs = await _db.IntegrationEvents.AsNoTracking()
-            .Where(e => e.IncidentId == incident.Id && e.AffectedCustomerRef != null)
-            .Select(e => e.AffectedCustomerRef)
-            .Distinct()
-            .CountAsync(cancellationToken);
+        // Bkz. IncidentsController.GetById / docs/product/M19_CLOSE_THE_PRODUCT_LOOP.md P0-A -
+        // aynı tek-sorgu, IncidentId FK'sına göre müşteri+operasyon impact/coverage hesabı.
+        var impact = await _db.IntegrationEvents.AsNoTracking()
+            .Where(e => e.IncidentId == incident.Id)
+            .GroupBy(e => 1)
+            .Select(g => new
+            {
+                TotalEvents = g.Count(),
+                EventsWithCustomer = g.Count(e => e.AffectedCustomerRef != null),
+                DistinctCustomers = g.Select(e => e.AffectedCustomerRef).Where(r => r != null).Distinct().Count(),
+                EventsWithOperation = g.Count(e => e.OperationRef != null),
+                DistinctOperations = g.Select(e => e.OperationRef).Where(r => r != null).Distinct().Count()
+            })
+            .FirstOrDefaultAsync(cancellationToken);
 
         Found = true;
         Id = incident.Id;
@@ -69,7 +91,17 @@ public class DetailModel : PageModel
         ReopenCount = incident.ReopenCount;
         Fingerprint = incident.Fingerprint;
         SuggestedAction = SuggestedActionCatalog.For(incident.Category);
-        AffectedCustomerCount = distinctCustomerRefs > 0 ? distinctCustomerRefs : null;
+
+        var totalEvents = impact?.TotalEvents ?? 0;
+        CustomerCoverage = ComputeCoverage(totalEvents, impact?.EventsWithCustomer ?? 0);
+        AffectedCustomerCount = CustomerCoverage == "None" ? null : impact!.DistinctCustomers;
+        OperationCoverage = ComputeCoverage(totalEvents, impact?.EventsWithOperation ?? 0);
+        KnownOperationCount = OperationCoverage == "None" ? null : impact!.DistinctOperations;
+
+        CanResolve = incident.IsActive;
+        ResolvedAt = incident.ResolvedAt;
+        ResolvedBy = incident.ResolvedBy;
+        ResolutionNote = incident.ResolutionNote;
 
         Evidence = evidence.Select(e => new EvidenceRow(e.SourceType.ToString(), e.Summary, e.CollectedAt)).ToList();
 
@@ -87,10 +119,43 @@ public class DetailModel : PageModel
         var timeline = new List<TimelineEntry> { new("İlk hata görüldü", FirstSeen) };
         timeline.AddRange(evidence.Select(e => new TimelineEntry($"Evidence toplandı: {e.SourceType}", e.CollectedAt)));
         if (LatestAnalysis is not null) timeline.Add(new TimelineEntry("AI analiz tamamlandı", latestAnalysisEntity!.CreatedAt));
+        if (ResolvedAt is not null) timeline.Add(new TimelineEntry("Incident resolve edildi", ResolvedAt.Value));
         Timeline = timeline.OrderBy(t => t.At).ToList();
 
         return Page();
     }
+
+    /// <summary>Bkz. docs/product/M19_CLOSE_THE_PRODUCT_LOOP.md P0-B - Post-Redirect-Get: resolve
+    /// sonrası aynı sayfaya GET olarak yönlendirir, böylece sayfa yenilenirse ikinci bir resolve
+    /// denemesi tetiklenmez.</summary>
+    public async Task<IActionResult> OnPostResolveAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var incident = await _db.Incidents.FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
+        if (incident is null) return NotFound();
+
+        try
+        {
+            incident.Resolve(ResolvedByInput, ResolutionNoteInput);
+
+            _db.AuditLogs.Add(AuditLog.Create(
+                AuditActorType.User, ResolvedByInput, AuditActions.IncidentResolved, AuditEntityTypes.Incident,
+                incident.Id, HttpContext.GetCorrelationId(),
+                changes: JsonSerializer.Serialize(new { note = ResolutionNoteInput })));
+
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch (InvalidOperationException)
+        {
+            // Bkz. Incident.Resolve - zaten Resolved/Ignored bir incident'ı tekrar resolve etmeye
+            // çalışmak geçersiz bir geçiş; sessizce yut, sayfa mevcut (değişmemiş) durumu gösterir.
+        }
+
+        return RedirectToPage(new { id });
+    }
+
+    private static string ComputeCoverage(int totalEvents, int eventsWithField) =>
+        eventsWithField == 0 ? "None" :
+        eventsWithField == totalEvents ? "Complete" : "Partial";
 
     public sealed record EvidenceRow(string SourceType, string Summary, DateTimeOffset CollectedAt);
 

@@ -579,9 +579,15 @@ bir ürün" değil "bir geliştiricinin iç aracı" izlenimi veriyordu. Düzelti
 Readiness) ve Faz 3'ün (Incident Intelligence) ilk kalemi tamamlandı (bkz.
 `docs/CTO_REVIEW_ANALYSIS.md`). Kalan iş:
 
-- **M19 — Customer Validation:** Gerçek kullanıcılarla (entegrasyon geliştiricisi, support
-  mühendisi, otomasyon danışmanı) M17 demo'sunu doğrulamak — "Bugün aynı problemi çözmek için
-  hangi ekranlara bakıyorsunuz?"
+- **M19 — Close the Product Loop: tamamlandı ✅.** Business Operation Identity (`OperationRef`/
+  `OperationType`/`BusinessRecordRef`), Incident Resolution lifecycle (`Incident.Resolve()`,
+  reopen-within-cooldown korunarak) ve AI Grounding false-positive düzeltmesi kapatıldı. Detaylar:
+  `docs/product/M19_CLOSE_THE_PRODUCT_LOOP.md`.
+- **M20 — Design Partner / Customer Validation:** Gerçek kullanıcılarla (entegrasyon geliştiricisi,
+  support mühendisi, otomasyon danışmanı) M17 demo'sunu doğrulamak — "Bugün aynı problemi çözmek
+  için hangi ekranlara bakıyorsunuz?" (Not: bu kalem daha önce "M19" olarak adlandırılmıştı; harici
+  M19 mühendislik spesifikasyonuyla numaralandırma çakışmasını önlemek için M20 olarak yeniden
+  adlandırıldı, bkz. `docs/CTO_REVIEW_ANALYSIS.md`.)
 - Demo video/GIF kaydı (dashboard artık hazır).
 - `fi-root-cause-v1` prompt'unun iyileştirilmesi — M14'te ölçülen skor (0.726) eşiği geçmiyor,
   en zayıf halkalar Grounding (0.100) ve NeedsHumanReviewAccuracy (0.250).

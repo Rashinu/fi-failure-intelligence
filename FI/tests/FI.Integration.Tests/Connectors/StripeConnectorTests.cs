@@ -128,6 +128,53 @@ public class StripeConnectorTests
         normalized.AffectedCustomerRef.Should().BeNull();
     }
 
+    // --- M19 P0-A: Business Operation Identity metadata extraction ---
+
+    [Fact]
+    public void Normalize_WithOperationMetadata_ExtractsAllThreeFields()
+    {
+        var body = """
+        {"type":"charge.failed","httpStatusCode":401,"data":{"object":{"id":"ch_123",
+          "metadata":{"operation_ref":"payment-sync-74921","operation_type":"PaymentSync","business_record_ref":"subscription-18372"}}}}
+        """;
+        var payload = new RawInboundPayload(body, new Dictionary<string, string>());
+
+        var normalized = _connector.Normalize(payload, isSignatureVerified: true);
+
+        normalized.OperationRef.Should().Be("payment-sync-74921");
+        normalized.OperationType.Should().Be("PaymentSync");
+        normalized.BusinessRecordRef.Should().Be("subscription-18372");
+    }
+
+    [Fact]
+    public void Normalize_WithoutMetadata_OperationFieldsAreNull()
+    {
+        var body = """{"type":"charge.failed","httpStatusCode":401,"data":{"object":{"id":"ch_123"}}}""";
+        var payload = new RawInboundPayload(body, new Dictionary<string, string>());
+
+        var normalized = _connector.Normalize(payload, isSignatureVerified: true);
+
+        normalized.OperationRef.Should().BeNull();
+        normalized.OperationType.Should().BeNull();
+        normalized.BusinessRecordRef.Should().BeNull();
+    }
+
+    [Fact]
+    public void Normalize_WithPartialMetadata_OnlyExtractsPresentFields()
+    {
+        var body = """
+        {"type":"charge.failed","httpStatusCode":401,"data":{"object":{"id":"ch_123",
+          "metadata":{"operation_ref":"payment-sync-1"}}}}
+        """;
+        var payload = new RawInboundPayload(body, new Dictionary<string, string>());
+
+        var normalized = _connector.Normalize(payload, isSignatureVerified: true);
+
+        normalized.OperationRef.Should().Be("payment-sync-1");
+        normalized.OperationType.Should().BeNull();
+        normalized.BusinessRecordRef.Should().BeNull();
+    }
+
     [Fact]
     public void Redact_MasksClientSecretAndApiKeyFields()
     {

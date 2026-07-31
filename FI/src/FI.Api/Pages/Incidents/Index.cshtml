@@ -2,20 +2,43 @@
 @model FI.Api.Pages.Incidents.IndexModel
 @{
     ViewData["Title"] = "Incidents";
+    ViewData["ActiveNav"] = "Incidents";
+    var criticalCount = Model.Incidents.Count(i => i.Severity == "Critical");
+    var reviewCount = Model.Incidents.Count(i => i.Status == "NeedsHumanReview");
+    var totalEvents = Model.Incidents.Sum(i => i.EventCount);
 }
 
 <h1 class="fi-page-title">Incidents</h1>
 <p class="fi-page-subtitle">Entegrasyon hatalarının deterministik sınıflandırma + evidence-backed AI analizi ile takibi.</p>
 
+<div class="fi-stat-row">
+    <div class="fi-stat-tile">
+        <div class="fi-stat-value">@Model.Incidents.Count</div>
+        <div class="fi-stat-label">Açık incident</div>
+    </div>
+    <div class="fi-stat-tile fi-stat-critical">
+        <div class="fi-stat-value">@criticalCount</div>
+        <div class="fi-stat-label">Critical</div>
+    </div>
+    <div class="fi-stat-tile fi-stat-review">
+        <div class="fi-stat-value">@reviewCount</div>
+        <div class="fi-stat-label">İnceleme bekliyor</div>
+    </div>
+    <div class="fi-stat-tile">
+        <div class="fi-stat-value">@totalEvents</div>
+        <div class="fi-stat-label">Toplam event</div>
+    </div>
+</div>
+
 <form class="fi-filters" method="get">
-    <select name="Severity" onchange="this.form.submit()">
+    <select name="Severity" onchange="this.form.submit()" aria-label="Severity filtrele">
         <option value="">Tüm severity'ler</option>
         @foreach (var s in new[] { "Critical", "High", "Medium", "Low" })
         {
             <option value="@s" selected="@(Model.Severity == s)">@s</option>
         }
     </select>
-    <select name="Status" onchange="this.form.submit()">
+    <select name="Status" onchange="this.form.submit()" aria-label="Durum filtrele">
         <option value="">Tüm durumlar</option>
         @foreach (var s in new[] { "Open", "Investigating", "AiAnalyzed", "NeedsHumanReview", "Reopened", "Resolved", "Ignored" })
         {
@@ -34,31 +57,33 @@
 }
 else
 {
-    <table class="fi-table">
-        <thead>
-            <tr>
-                <th>Entegrasyon</th>
-                <th>Kategori</th>
-                <th>Severity</th>
-                <th>Durum</th>
-                <th>Event</th>
-                <th>Son görülme</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var i in Model.Incidents)
-            {
-                <tr onclick="location.href='/Incidents/Detail/@i.Id'" style="cursor:pointer">
-                    <td><a href="/Incidents/Detail/@i.Id">@i.IntegrationName</a></td>
-                    <td>@i.Category</td>
-                    <td><span class="fi-badge @SeverityBadgeClass(i.Severity)">@i.Severity</span></td>
-                    <td><span class="fi-badge @StatusBadgeClass(i.Status)">@i.Status</span></td>
-                    <td>@i.EventCount</td>
-                    <td>@i.LastSeen.ToLocalTime().ToString("g")</td>
+    <div class="fi-table-wrap">
+        <table class="fi-table">
+            <thead>
+                <tr>
+                    <th>Entegrasyon</th>
+                    <th>Kategori</th>
+                    <th>Severity</th>
+                    <th>Durum</th>
+                    <th>Event</th>
+                    <th>Son görülme</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var i in Model.Incidents)
+                {
+                    <tr onclick="location.href='/Incidents/Detail/@i.Id'" style="cursor:pointer">
+                        <td><a href="/Incidents/Detail/@i.Id">@i.IntegrationName</a></td>
+                        <td>@i.Category</td>
+                        <td><span class="fi-badge @SeverityBadgeClass(i.Severity)">@i.Severity</span></td>
+                        <td><span class="fi-badge @StatusBadgeClass(i.Status)">@i.Status</span></td>
+                        <td>@i.EventCount</td>
+                        <td>@i.LastSeen.ToLocalTime().ToString("g")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 }
 
 @functions {

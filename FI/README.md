@@ -560,6 +560,19 @@ senaryosu sıfırdan yeniden çalıştırılarak doğrulandı: her iki replika d
 kalkıyor. Normal tek-instance geliştirme stack'i ve demo seed script'i de bu değişiklikten sonra
 yeniden doğrulandı.
 
+**UI/UX gözden geçirmesi tamamlandı.** Nav bar önceden `Incidents | API | Jobs`'u eşit ağırlıkta
+yan yana gösteriyordu — Swagger ve Hangfire dashboard'u (iç geliştirici araçları) ürünün kendisiyle
+aynı sırada, sanki birer ürün özelliğiymiş gibi sunuluyordu. Bu, projeyi ilk açan birine "planlı
+bir ürün" değil "bir geliştiricinin iç aracı" izlenimi veriyordu. Düzeltildi:
+- Ana nav artık yalnızca `Incidents`'ı (gerçek ürünü) içeriyor; Swagger/Hangfire linkleri sayfanın
+  altına, açıkça "Geliştirici" etiketli, görsel olarak geri planda bir footer'a taşındı.
+- Dashboard'a, zaten yüklenmiş incident listesinden türetilen (yeni bir API çağrısı gerektirmeyen)
+  bir özet istatistik satırı eklendi (açık incident / critical / inceleme bekleyen / toplam event).
+- Tipografi (Inter + JetBrains Mono), renk/yüzey katmanlaması, kart gölgeleri, badge kontrastı ve
+  responsive davranış (760px altında stat grid 2 sütuna, detay header'ı dikey) yeniden tasarlandı.
+- Gerçek Docker Compose'da canlı doğrulandı (ekran görüntüleriyle) — dashboard, detail sayfası ve
+  Swagger/Hangfire linkleri sorunsuz çalışıyor.
+
 ## Sonraki Adımlar (Post-M18)
 
 14 günlük planın çekirdek zinciri, CTO review'ün Faz 1 (Product Proof), Faz 2 (Production

@@ -4,19 +4,31 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@(ViewData["Title"] is string t ? $"{t} — FI" : "FI — Failure Intelligence")</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/css/site.css" />
 </head>
 <body>
     <header class="fi-header">
-        <a class="fi-brand" href="/Incidents">FI <span>Failure Intelligence</span></a>
+        <a class="fi-brand" href="/Incidents">
+            <span class="fi-logo-mark">FI</span>
+            Failure Intelligence
+        </a>
         <nav>
-            <a href="/Incidents">Incidents</a>
-            <a href="/swagger">API</a>
-            <a href="/hangfire">Jobs</a>
+            <a href="/Incidents" class="@(ViewData["ActiveNav"]?.ToString() == "Incidents" ? "fi-nav-active" : "")">Incidents</a>
         </nav>
     </header>
     <main class="fi-main">
         @RenderBody()
     </main>
+    <footer class="fi-footer">
+        <span>FI — evidence-backed failure intelligence</span>
+        <div class="fi-footer-dev">
+            <span class="fi-footer-dev-label">Geliştirici</span>
+            <a href="/swagger">API dokümantasyonu</a>
+            <a href="/hangfire">Job kuyruğu</a>
+        </div>
+    </footer>
 </body>
 </html>

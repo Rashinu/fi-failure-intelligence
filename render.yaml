@@ -1,0 +1,29 @@
+databases:
+  - name: fi-postgres
+    databaseName: fi
+    user: fi_app
+    plan: free
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: fi-api
+    runtime: docker
+    plan: free
+    dockerfilePath: FI/docker/Dockerfile
+    dockerContext: FI
+    healthCheckPath: /health/live
+    envVars:
+      # Render'in kendi Postgres URI formati (postgres://...) Npgsql'in beklendigi
+      # "Host=...;Port=...;Database=...;Username=...;Password=..." formatiyla uyusmuyor ve
+      # render.yaml'da bir donusum/template fonksiyonu yok - bu yuzden `fromDatabase` yerine
+      # `sync: false` birakildi; deploy sonrasi Postgres olusunca gercek Npgsql connection
+      # string'i elle (Render dashboard > fi-api > Environment) girilecek.
+      - key: ConnectionStrings__FiDatabase
+        sync: false
+      - key: Ai__AnthropicApiKey
+        sync: false
+      - key: Admin__SharedSecret
+        sync: false
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production

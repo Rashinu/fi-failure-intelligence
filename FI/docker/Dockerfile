@@ -16,5 +16,12 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 COPY --from=build /app/publish .
 EXPOSE 8080
-ENV ASPNETCORE_URLS=http://+:8080
-ENTRYPOINT ["dotnet", "FI.Api.dll"]
+
+# Bkz. docs/product/DEPLOYMENT.md - lokal docker-compose 8080'i sabit bekliyor (ASPNETCORE_URLS
+# env var'i orada set edilir ve asagidaki komut satiri argumaniyla ayni degere cozulur, davranis
+# degismez). Platform-hosted ortamlarda (Render, Railway vb.) container disaridan enjekte edilen
+# bir $PORT env var'ina bagli olmayi bekleyebilir; exec-form bir ENTRYPOINT bunu genisletemez, bu
+# yuzden shell-form kullanilip --urls komut satiri argumaniyla (ASPNETCORE_URLS env var'indan daha
+# yuksek onceliklidir) cozuluyor. docker-compose'un `entrypoint: [...--migrate]` override'i bu
+# shell script'i tamamen degistirir, bu yuzden migrate modunu etkilemez.
+ENTRYPOINT ["/bin/sh", "-c", "exec dotnet FI.Api.dll --urls http://+:${PORT:-8080}"]

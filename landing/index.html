@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FI — Entegrasyon bozulduğunda tahmin etme, kanıtla</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #11141c;
+    --surface: #1a1f2b;
+    --surface-2: #212736;
+    --border: #2b3144;
+    --text: #e9e7de;
+    --text-dim: #9198ac;
+    --text-faint: #5b6376;
+    --amber: #f2b84b;
+    --teal: #5fd4c4;
+    --red: #e0654f;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Inter', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 64px 64px;
+    opacity: 0.15;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+  a { color: inherit; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+
+  /* NAV */
+  nav {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(17,20,28,0.85);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  nav .wrap { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; }
+  .logo { font-family: var(--mono); font-weight: 700; font-size: 16px; letter-spacing: 0.02em; display: flex; align-items: center; gap: 8px; }
+  .logo .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 8px var(--teal); }
+  .nav-cta {
+    font-family: var(--mono); font-size: 13px; font-weight: 600;
+    padding: 8px 16px; border: 1px solid var(--border); border-radius: 4px;
+    text-decoration: none; color: var(--text); transition: border-color 0.15s;
+  }
+  .nav-cta:hover { border-color: var(--teal); }
+
+  /* HERO */
+  header.hero { padding: 96px 0 72px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; color: var(--amber);
+    letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .eyebrow::before { content: "▲"; font-size: 10px; }
+  h1 {
+    font-family: var(--sans); font-weight: 800; font-size: clamp(34px, 5.2vw, 58px);
+    line-height: 1.08; letter-spacing: -0.02em; max-width: 15ch; margin-bottom: 24px;
+  }
+  h1 em { font-style: normal; color: var(--teal); }
+  .hero-sub {
+    font-size: 18px; color: var(--text-dim); max-width: 46ch; margin-bottom: 36px;
+  }
+  .cta-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 64px; }
+  .btn {
+    font-family: var(--mono); font-weight: 600; font-size: 14px;
+    padding: 13px 22px; border-radius: 4px; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 8px; transition: transform 0.12s, box-shadow 0.12s;
+  }
+  .btn-primary { background: var(--teal); color: #0c1410; }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(95,212,196,0.25); }
+  .btn-secondary { border: 1px solid var(--border); color: var(--text); }
+  .btn-secondary:hover { border-color: var(--text-dim); }
+
+  /* INCIDENT CARD — signature element */
+  .incident-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+  .incident-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid var(--border); background: var(--surface-2);
+  }
+  .incident-head-left { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 13px; }
+  .sev-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .incident-id { color: var(--text-faint); }
+  .badge {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 600; padding: 3px 8px;
+    border-radius: 3px; text-transform: uppercase; letter-spacing: 0.03em;
+  }
+  .badge-critical { background: rgba(224,101,79,0.15); color: var(--red); border: 1px solid rgba(224,101,79,0.3); }
+  .incident-body { padding: 20px; }
+  .incident-title { font-size: 17px; font-weight: 600; margin-bottom: 4px; }
+  .incident-meta { font-family: var(--mono); font-size: 12.5px; color: var(--text-faint); margin-bottom: 20px; }
+  .timeline { display: flex; flex-direction: column; gap: 0; margin-bottom: 20px; }
+  .tl-step { display: flex; gap: 14px; position: relative; padding-bottom: 18px; }
+  .tl-step:last-child { padding-bottom: 0; }
+  .tl-marker {
+    width: 20px; display: flex; flex-direction: column; align-items: center; flex-shrink: 0;
+  }
+  .tl-marker .node { width: 8px; height: 8px; border-radius: 50%; background: var(--teal); margin-top: 4px; }
+  .tl-marker .line { flex: 1; width: 1px; background: var(--border); margin-top: 4px; }
+  .tl-step:last-child .line { display: none; }
+  .tl-content { font-size: 13.5px; }
+  .tl-content .t-label { color: var(--text); font-weight: 500; }
+  .tl-content .t-detail { color: var(--text-faint); font-family: var(--mono); font-size: 12px; margin-top: 2px; }
+  .evidence-strip {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px;
+  }
+  .ev-chip {
+    font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+    border: 1px solid var(--border); border-radius: 3px; padding: 4px 9px;
+  }
+  .analysis-box {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px;
+  }
+  .analysis-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .analysis-label { font-family: var(--mono); font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.05em; }
+  .confidence { font-family: var(--mono); font-size: 11px; color: var(--amber); }
+  .analysis-text { font-size: 13.5px; color: var(--text-dim); line-height: 1.55; margin-bottom: 10px; }
+  .review-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 11px; color: var(--amber);
+    background: rgba(242,184,75,0.1); border: 1px solid rgba(242,184,75,0.25);
+    padding: 4px 10px; border-radius: 3px;
+  }
+
+  /* SECTIONS */
+  section { padding: 72px 0; border-top: 1px solid var(--border); }
+  .section-eyebrow {
+    font-family: var(--mono); font-size: 12px; color: var(--text-faint);
+    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px;
+  }
+  h2 { font-size: clamp(26px, 3.4vw, 36px); font-weight: 800; letter-spacing: -0.015em; max-width: 22ch; margin-bottom: 16px; }
+  .section-sub { color: var(--text-dim); font-size: 16px; max-width: 56ch; margin-bottom: 48px; }
+
+  /* PROBLEM */
+  .problem-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .problem-card { padding: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+  .problem-card .icon { font-family: var(--mono); color: var(--red); font-size: 20px; margin-bottom: 14px; }
+  .problem-card h3 { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+  .problem-card p { font-size: 14px; color: var(--text-dim); }
+
+  /* HOW IT WORKS */
+  .steps { display: flex; flex-direction: column; }
+  .step {
+    display: grid; grid-template-columns: 64px 1fr; gap: 20px;
+    padding: 28px 0; border-bottom: 1px solid var(--border);
+  }
+  .step:last-child { border-bottom: none; }
+  .step-num { font-family: var(--mono); font-size: 13px; color: var(--text-faint); padding-top: 3px; }
+  .step-body h3 { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+  .step-body p { color: var(--text-dim); font-size: 14.5px; max-width: 60ch; }
+  .step-body code {
+    font-family: var(--mono); font-size: 12.5px; background: var(--surface); border: 1px solid var(--border);
+    padding: 2px 6px; border-radius: 3px; color: var(--teal);
+  }
+
+  /* HONESTY */
+  .honesty-panel {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center;
+  }
+  .honesty-panel p { color: var(--text-dim); font-size: 15px; margin-bottom: 16px; }
+  .honesty-visual {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 24px;
+    font-family: var(--mono); font-size: 13px;
+  }
+  .honesty-line { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px dashed var(--border); }
+  .honesty-line:last-child { border-bottom: none; }
+  .honesty-ok { color: var(--teal); }
+  .honesty-warn { color: var(--amber); }
+
+  /* INTEGRATIONS */
+  .integrations-row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .integration-pill {
+    font-family: var(--mono); font-size: 13px; padding: 10px 18px;
+    border: 1px solid var(--border); border-radius: 20px; color: var(--text-dim);
+  }
+
+  /* CTA FOOTER */
+  .cta-final { text-align: center; padding: 96px 0 72px; }
+  .cta-final h2 { max-width: none; margin: 0 auto 16px; }
+  .cta-final .section-sub { margin: 0 auto 36px; }
+  .cta-final .cta-row { justify-content: center; }
+
+  footer {
+    border-top: 1px solid var(--border); padding: 32px 0;
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--mono); font-size: 12px; color: var(--text-faint); flex-wrap: wrap; gap: 12px;
+  }
+
+  @media (max-width: 760px) {
+    .problem-grid { grid-template-columns: 1fr; }
+    .honesty-panel { grid-template-columns: 1fr; }
+    .hero-grid { grid-template-columns: 1fr !important; }
+  }
+  .hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <div class="logo"><span class="dot"></span>FI</div>
+    <a class="nav-cta" href="https://fi-api-0bif.onrender.com" target="_blank" rel="noopener">Canlı demo →</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <div class="eyebrow">Evidence-backed incident intelligence</div>
+      <h1>Entegrasyon bozulduğunda <em>tahmin etme,</em> kanıtla.</h1>
+      <p class="hero-sub">
+        Stripe, GitHub, SES/SendGrid entegrasyonun patladığında FI, kanıta dayanmayan hiçbir
+        şey söylemez. Deploy geçmişi, önceki hatalar ve config değişikliklerini toplar, kök
+        nedeni yalnızca bu kanıta dayanarak açıklar — emin değilse bunu açıkça söyler.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://fi-api-0bif.onrender.com" target="_blank" rel="noopener">Canlı demoyu incele</a>
+        <a class="btn btn-secondary" href="mailto:muratberatkeskin@gmail.com?subject=FI%20Beta%20Erişimi&body=Merhaba%2C%20FI%20beta%20programına%20katılmak%20istiyorum.%0A%0AKullandığımız%20entegrasyonlar%3A%0AEkip%20büyüklüğü%3A">Beta'ya katıl</a>
+      </div>
+    </div>
+
+    <div class="incident-card">
+      <div class="incident-head">
+        <div class="incident-head-left">
+          <span class="sev-dot"></span>
+          <span class="incident-id">INC-0847</span>
+        </div>
+        <span class="badge badge-critical">Critical</span>
+      </div>
+      <div class="incident-body">
+        <div class="incident-title">AuthenticationError — Stripe Payments</div>
+        <div class="incident-meta">fingerprint: 7a3f9e2c · eventCount: 6 · 4dk önce</div>
+
+        <div class="timeline">
+          <div class="tl-step">
+            <div class="tl-marker"><div class="node"></div><div class="line"></div></div>
+            <div class="tl-content">
+              <div class="t-label">İlk hata alındı</div>
+              <div class="t-detail">6× 401 — webhook imza doğrulaması başarısız</div>
+            </div>
+          </div>
+          <div class="tl-step">
+            <div class="tl-marker"><div class="node"></div><div class="line"></div></div>
+            <div class="tl-content">
+              <div class="t-label">Kanıt toplandı</div>
+              <div class="t-detail">config değişikliği, önceki olaylar, deploy geçmişi</div>
+            </div>
+          </div>
+          <div class="tl-step">
+            <div class="tl-marker"><div class="node"></div></div>
+            <div class="tl-content">
+              <div class="t-label">AI analiz tamamlandı</div>
+              <div class="t-detail">yalnızca toplanan kanıta dayanarak</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="evidence-strip">
+          <span class="ev-chip">CONFIG_CHANGE</span>
+          <span class="ev-chip">PREVIOUS_EVENT ×5</span>
+          <span class="ev-chip">DEPLOYMENT</span>
+        </div>
+
+        <div class="analysis-box">
+          <div class="analysis-head">
+            <span class="analysis-label">Kök neden</span>
+            <span class="confidence">confidence: 0.91</span>
+          </div>
+          <div class="analysis-text">
+            API key rotasyonu, ilk hatadan 12 dakika önce yapıldı. Webhook secret'ı henüz
+            güncellenmemiş — eski secret ile imzalanan istekler artık geçersiz.
+          </div>
+          <span class="review-badge">✓ kanıtla doğrulandı</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="problem">
+  <div class="wrap">
+    <div class="section-eyebrow">Sorun</div>
+    <h2>Entegrasyon bozulunca gerçek maliyet, hatayı bulmak.</h2>
+    <p class="section-sub">
+      Hata mesajı 401. Peki neden? Key mi döndü, webhook secret mı değişti, provider mı
+      outage yaşıyor? Bunu anlamak için loglara, deploy geçmişine ve Slack'e ayrı ayrı bakmak
+      gerekiyor — genelde en meşgul kişi bunu yapıyor.
+    </p>
+    <div class="problem-grid">
+      <div class="problem-card">
+        <div class="icon">01</div>
+        <h3>Dağınık kanıt</h3>
+        <p>Deploy logu ayrı yerde, hata logu ayrı yerde, config geçmişi hiçbir yerde. Kök nedeni birleştirmek insan işi.</p>
+      </div>
+      <div class="problem-card">
+        <div class="icon">02</div>
+        <h3>Tekrarlayan araştırma</h3>
+        <p>Aynı hata sınıfı ayda birkaç kez tekrar ediyor, her seferinde sıfırdan araştırılıyor.</p>
+      </div>
+      <div class="problem-card">
+        <div class="icon">03</div>
+        <h3>AI'a güvenilmiyor</h3>
+        <p>Genel amaçlı AI araçları kanıtı olmadan da bir hikaye anlatır — kendinden emin ve genelde yanlış.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="section-eyebrow">Nasıl çalışır</div>
+    <h2>Deterministik kod karar verir, AI yalnızca yorumlar.</h2>
+    <p class="section-sub">
+      Sınıflandırma, fingerprint, severity — hepsi kural tabanlı ve kesin. AI hiçbir zaman
+      hata sınıfına karar vermez; yalnızca toplanan kanıta dayanarak kök nedeni anlatır.
+    </p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <div class="step-body">
+          <h3>Webhook geldiğinde</h3>
+          <p>Stripe, GitHub, SES/SendGrid'den gelen olay imza doğrulamasından geçer, <code>EventClassifier</code> onu 11 kategoriden birine deterministik olarak yerleştirir.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <div class="step-body">
+          <h3>Fingerprint ve severity hesaplanır</h3>
+          <p>Aynı hatanın tekrarları tek incident'ta toplanır, zaman penceresine göre severity belirlenir — kimse manuel etiketlemez.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <div class="step-body">
+          <h3>Kanıt toplanır</h3>
+          <p>Deploy geçmişi, önceki olaylar, geçmiş incident'lar ve config değişiklikleri — yalnızca gerçekten var olan kaynaklar dahil edilir.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">04</div>
+        <div class="step-body">
+          <h3>AI yalnızca yorumlar</h3>
+          <p>Claude, toplanan kanıta dayanarak kök nedeni anlatır. Kanıt dışına çıkan her iddia sistematik olarak yakalanır.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">05</div>
+        <div class="step-body">
+          <h3>Incident açılır veya insana devredilir</h3>
+          <p>Analiz güvenilirse incident kanıtla birlikte kapanır. Değilse <code>NEEDS_HUMAN_REVIEW</code> — sessizce yanlış bir hikaye asla geçmez.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="honesty">
+  <div class="wrap">
+    <div class="section-eyebrow">Fark</div>
+    <div class="honesty-panel">
+      <div>
+        <h2>Emin değilse söylüyor.</h2>
+        <p>Çoğu AI aracı her zaman bir cevap üretir — emin olmasa bile. FI'da bu bilinçli olarak engellenmiş: analiz kanıtla uyuşmuyorsa, düşük confidence'a sahipse veya çelişkili kanıt varsa, sistem kendi belirsizliğini raporlar ve incident'ı insana devreder.</p>
+        <p>Bu, "AI her şeyi çözer" vaadinden daha az gösterişli — ama üretimde güvenebileceğin tek yaklaşım bu.</p>
+      </div>
+      <div class="honesty-visual">
+        <div class="honesty-line"><span>Kanıt yeterli, confidence yüksek</span><span class="honesty-ok">AI_ANALYZED</span></div>
+        <div class="honesty-line"><span>Kanıt çelişkili</span><span class="honesty-warn">NEEDS_HUMAN_REVIEW</span></div>
+        <div class="honesty-line"><span>Kanıt dışı iddia tespit edildi</span><span class="honesty-warn">NEEDS_HUMAN_REVIEW</span></div>
+        <div class="honesty-line"><span>Kanıt hiç yok</span><span class="honesty-warn">AI hiç çağrılmaz</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="integrations">
+  <div class="wrap">
+    <div class="section-eyebrow">Desteklenen entegrasyonlar</div>
+    <h2>Bugün desteklenenler, yolda olanlar</h2>
+    <div class="integrations-row">
+      <span class="integration-pill">Stripe</span>
+      <span class="integration-pill">GitHub Deployments</span>
+      <span class="integration-pill">SES</span>
+      <span class="integration-pill">SendGrid</span>
+      <span class="integration-pill" style="opacity:0.5">+ kendi webhook'un (Beta'da)</span>
+    </div>
+  </div>
+</section>
+
+<section class="cta-final">
+  <div class="wrap">
+    <div class="section-eyebrow" style="text-align:center">Beta programı açık</div>
+    <h2>İlk kanıt-tabanlı incident'ını 15 dakikada gör.</h2>
+    <p class="section-sub">Kurulum ücretsiz, canlı sistemi hemen dene. Beta kullanıcıları fiyatlandırmayı birlikte şekillendiriyor.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://fi-api-0bif.onrender.com" target="_blank" rel="noopener">Canlı demoyu incele</a>
+      <a class="btn btn-secondary" href="mailto:muratberatkeskin@gmail.com?subject=FI%20Beta%20Erişimi&body=Merhaba%2C%20FI%20beta%20programına%20katılmak%20istiyorum.%0A%0AKullandığımız%20entegrasyonlar%3A%0AEkip%20büyüklüğü%3A">Beta'ya katıl</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap" style="display:flex; justify-content:space-between; width:100%; flex-wrap:wrap; gap:12px;">
+    <span>FI — Failure Intelligence</span>
+    <span>.NET 8 · PostgreSQL · Claude</span>
+  </div>
+</footer>
+
+</body>
+</html>

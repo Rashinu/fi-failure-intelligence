@@ -10,10 +10,10 @@
 @if (Model.ReopenCount > 0)
 {
     <div class="fi-reopen-banner">
-        <strong>⟲ Tekrarlayan incident:</strong> bu, daha önce çözülmüş/kapatılmış ama
-        @Model.ReopenCount kez yeniden açılmış (reopen) bir incident — ilk kez görülen yeni bir
-        olay değil. Aşağıdaki "İlk görülme" ve event sayısı, en son reopen'a göredir; önceki
-        çözülme geçmişini yansıtmaz.
+        <strong>⟲ Recurring incident:</strong> this incident was previously resolved/closed but
+        has been reopened @Model.ReopenCount time(s) — it is not a newly-observed event. The
+        "First seen" date and event count below reflect the most recent reopen, not the full
+        resolution history.
     </div>
 }
 
@@ -21,9 +21,9 @@
     <div>
         <h1 class="fi-page-title">@Model.IntegrationName — @Model.Category</h1>
         <div class="fi-detail-meta">
-            İlk görülme @Model.FirstSeen.ToLocalTime().ToString("g") ·
-            Son görülme @Model.LastSeen.ToLocalTime().ToString("g") ·
-            @Model.EventCount event
+            First seen @Model.FirstSeen.ToLocalTime().ToString("g") ·
+            Last seen @Model.LastSeen.ToLocalTime().ToString("g") ·
+            @Model.EventCount events
         </div>
     </div>
     <div>
@@ -51,40 +51,44 @@
     {
         <form method="post" asp-page-handler="Resolve" class="fi-resolve-form">
             <input type="hidden" name="id" value="@Model.Id" />
-            <input type="text" name="ResolvedByInput" placeholder="Adınız (opsiyonel)" class="fi-resolve-input" />
-            <input type="text" name="ResolutionNoteInput" placeholder="Çözüm notu (opsiyonel)" class="fi-resolve-input fi-resolve-input-wide" />
+            <input type="text" name="ResolvedByInput" placeholder="Your name (optional)" class="fi-resolve-input" />
+            <input type="text" name="ResolutionNoteInput" placeholder="Resolution note (optional)" class="fi-resolve-input fi-resolve-input-wide" />
             <button type="submit" class="fi-btn-resolve">Resolve Incident</button>
         </form>
     }
 </div>
 
 <div class="fi-section">
-    <h2>İş Etkisi</h2>
+    <h2>Business Impact</h2>
+    <p class="fi-impact-legend">
+        Event = a raw technical failure · Operation = a real business action those events
+        represent · Customer = a real person or account affected by it.
+    </p>
     <div class="fi-ai-row fi-card">
-        <div><strong>Teknik event</strong>@Model.EventCount</div>
+        <div><strong>Technical events</strong>@Model.EventCount</div>
         <div>
-            <strong>Bilinen operasyon</strong>
-            @(Model.KnownOperationCount is { } opCount ? opCount.ToString() : "bilinmiyor")
+            <strong>Known operations</strong>
+            @(Model.KnownOperationCount is { } opCount ? opCount.ToString() : "unknown")
             @if (Model.OperationCoverage == "Partial")
             {
-                <div class="fi-coverage-note">Kısmi kapsam — bazı event'ler operasyon bilgisi taşımıyor</div>
+                <div class="fi-coverage-note">Partial coverage — some events don't carry operation data</div>
             }
         </div>
         <div>
-            <strong>Etkilenen müşteri</strong>
-            @(Model.AffectedCustomerCount is { } c ? c.ToString() : "bilinmiyor (provider bu veriyi taşımıyor)")
+            <strong>Affected customers</strong>
+            @(Model.AffectedCustomerCount is { } c ? c.ToString() : "unknown (provider doesn't supply this data)")
             @if (Model.CustomerCoverage == "Partial")
             {
-                <div class="fi-coverage-note">Kısmi kapsam</div>
+                <div class="fi-coverage-note">Partial coverage</div>
             }
         </div>
-        <div><strong>Süre</strong>@FormatDuration(Model.LastSeen - Model.FirstSeen)</div>
+        <div><strong>Duration</strong>@FormatDuration(Model.LastSeen - Model.FirstSeen)</div>
     </div>
 </div>
 
 <div class="fi-section">
-    <h2>Şimdi ne yapmalıyım?</h2>
-    <div class="fi-suggested-action"><strong>Önerilen ilk adım:</strong> @Model.SuggestedAction</div>
+    <h2>What should I do now?</h2>
+    <div class="fi-suggested-action"><strong>Suggested first step:</strong> @Model.SuggestedAction</div>
 </div>
 
 @if (Model.LatestAnalysis is not null)
@@ -93,7 +97,7 @@
         <h2>AI-Assisted Analysis</h2>
         <div class="fi-card fi-ai-card">
             <p class="fi-ai-title">@Model.LatestAnalysis.Title</p>
-            <strong class="fi-eyebrow">Olası neden (AI destekli yorum, kesinleştirilmiş kanıt değil)</strong>
+            <strong class="fi-eyebrow">Probable cause (AI-assisted interpretation, not confirmed evidence)</strong>
             <p>@Model.LatestAnalysis.ProbableRootCause</p>
             <div class="fi-ai-row">
                 <div>
@@ -102,16 +106,16 @@
                     @((int)(Model.LatestAnalysis.Confidence * 100))%
                 </div>
                 <div>
-                    <strong>İnsan incelemesi gerekiyor mu?</strong>
+                    <strong>Needs human review?</strong>
                     <span class="fi-badge @(Model.LatestAnalysis.NeedsHumanReview ? "fi-badge-review" : "fi-badge-analyzed")">
-                        @(Model.LatestAnalysis.NeedsHumanReview ? "Evet" : "Hayır")
+                        @(Model.LatestAnalysis.NeedsHumanReview ? "Yes" : "No")
                     </span>
                 </div>
             </div>
             @if (Model.LatestAnalysis.RecommendedActions.Count > 0)
             {
                 <div>
-                    <strong class="fi-eyebrow">AI'nin önerdiği aksiyonlar</strong>
+                    <strong class="fi-eyebrow">AI-suggested actions</strong>
                     <ul class="fi-actions-list">
                         @foreach (var a in Model.LatestAnalysis.RecommendedActions)
                         {
@@ -128,8 +132,8 @@ else
     <div class="fi-section">
         <h2>AI-Assisted Analysis</h2>
         <div class="fi-empty">
-            Henüz bir AI analizi yok — evidence toplanıyor veya evidence yetersiz olduğu için
-            analiz atlandı (bkz. Bölüm 24.1: evidence yoksa AI çağrısı hiç yapılmaz).
+            No AI analysis yet — evidence is still being collected, or analysis was skipped
+            because evidence was insufficient (by design: without evidence, no AI call is made).
         </div>
     </div>
 }
@@ -138,7 +142,7 @@ else
     <h2>Evidence (@Model.Evidence.Count)</h2>
     @if (Model.Evidence.Count == 0)
     {
-        <div class="fi-empty">Bu incident için evidence bulunamadı.</div>
+        <div class="fi-empty">No evidence found for this incident.</div>
     }
     else
     {
@@ -169,16 +173,18 @@ else
 </div>
 
 <div class="fi-section">
-    <h2>Fingerprint</h2>
-    <div class="fi-card fi-fingerprint">@Model.Fingerprint</div>
+    <details class="fi-dev-detail">
+        <summary>Developer / technical detail</summary>
+        <div class="fi-card fi-fingerprint">@Model.Fingerprint</div>
+    </details>
 </div>
 
 @functions {
     string FormatDuration(TimeSpan duration) => duration.TotalMinutes < 1
-        ? "< 1 dakika"
+        ? "< 1 min"
         : duration.TotalHours < 1
-            ? $"{(int)duration.TotalMinutes} dakika"
-            : $"{(int)duration.TotalHours} saat {(int)duration.Minutes} dakika";
+            ? $"{(int)duration.TotalMinutes} min"
+            : $"{(int)duration.TotalHours}h {(int)duration.Minutes}m";
 
     string SeverityBadgeClass(string severity) => severity switch
     {

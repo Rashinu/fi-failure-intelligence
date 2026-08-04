@@ -9,12 +9,12 @@
 }
 
 <h1 class="fi-page-title">Incidents</h1>
-<p class="fi-page-subtitle">Entegrasyon hatalarının deterministik sınıflandırma + evidence-backed AI analizi ile takibi.</p>
+<p class="fi-page-subtitle">Track integration failures with deterministic classification and evidence-backed AI analysis.</p>
 
 <div class="fi-stat-row">
     <div class="fi-stat-tile">
         <div class="fi-stat-value">@Model.Incidents.Count</div>
-        <div class="fi-stat-label">Açık incident</div>
+        <div class="fi-stat-label">Open incidents</div>
     </div>
     <div class="fi-stat-tile fi-stat-critical">
         <div class="fi-stat-value">@criticalCount</div>
@@ -22,24 +22,24 @@
     </div>
     <div class="fi-stat-tile fi-stat-review">
         <div class="fi-stat-value">@reviewCount</div>
-        <div class="fi-stat-label">İnceleme bekliyor</div>
+        <div class="fi-stat-label">Needs review</div>
     </div>
     <div class="fi-stat-tile">
         <div class="fi-stat-value">@totalEvents</div>
-        <div class="fi-stat-label">Toplam event</div>
+        <div class="fi-stat-label">Total events</div>
     </div>
 </div>
 
 <form class="fi-filters" method="get">
-    <select name="Severity" onchange="this.form.submit()" aria-label="Severity filtrele">
-        <option value="">Tüm severity'ler</option>
+    <select name="Severity" onchange="this.form.submit()" aria-label="Filter by severity">
+        <option value="">All severities</option>
         @foreach (var s in new[] { "Critical", "High", "Medium", "Low" })
         {
             <option value="@s" selected="@(Model.Severity == s)">@s</option>
         }
     </select>
-    <select name="Status" onchange="this.form.submit()" aria-label="Durum filtrele">
-        <option value="">Tüm durumlar</option>
+    <select name="Status" onchange="this.form.submit()" aria-label="Filter by status">
+        <option value="">All statuses</option>
         @foreach (var s in new[] { "Open", "Investigating", "AiAnalyzed", "NeedsHumanReview", "Reopened", "Resolved", "Ignored" })
         {
             <option value="@s" selected="@(Model.Status == s)">@s</option>
@@ -47,13 +47,13 @@
     </select>
     @if (!string.IsNullOrWhiteSpace(Model.Severity) || !string.IsNullOrWhiteSpace(Model.Status))
     {
-        <a href="/Incidents">Filtreleri temizle</a>
+        <a href="/Incidents">Clear filters</a>
     }
 </form>
 
 @if (Model.Incidents.Count == 0)
 {
-    <div class="fi-empty">Kriterlere uyan incident yok.</div>
+    <div class="fi-empty">No incidents match the current filters.</div>
 }
 else
 {
@@ -61,12 +61,12 @@ else
         <table class="fi-table">
             <thead>
                 <tr>
-                    <th>Entegrasyon</th>
-                    <th>Kategori</th>
+                    <th>Integration</th>
+                    <th>Category</th>
                     <th>Severity</th>
-                    <th>Durum</th>
-                    <th>Event</th>
-                    <th>Son görülme</th>
+                    <th>Status</th>
+                    <th>Events</th>
+                    <th>Last seen</th>
                 </tr>
             </thead>
             <tbody>

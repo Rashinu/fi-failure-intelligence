@@ -116,10 +116,10 @@ public class DetailModel : PageModel
                 latestAnalysisEntity.CreatedAt);
         }
 
-        var timeline = new List<TimelineEntry> { new("İlk hata görüldü", FirstSeen) };
-        timeline.AddRange(evidence.Select(e => new TimelineEntry($"Evidence toplandı: {e.SourceType}", e.CollectedAt)));
-        if (LatestAnalysis is not null) timeline.Add(new TimelineEntry("AI analiz tamamlandı", latestAnalysisEntity!.CreatedAt));
-        if (ResolvedAt is not null) timeline.Add(new TimelineEntry("Incident resolve edildi", ResolvedAt.Value));
+        var timeline = new List<TimelineEntry> { new("First error observed", FirstSeen) };
+        timeline.AddRange(evidence.Select(e => new TimelineEntry($"Evidence collected: {e.SourceType}", e.CollectedAt)));
+        if (LatestAnalysis is not null) timeline.Add(new TimelineEntry("AI analysis completed", latestAnalysisEntity!.CreatedAt));
+        if (ResolvedAt is not null) timeline.Add(new TimelineEntry("Incident resolved", ResolvedAt.Value));
         Timeline = timeline.OrderBy(t => t.At).ToList();
 
         return Page();

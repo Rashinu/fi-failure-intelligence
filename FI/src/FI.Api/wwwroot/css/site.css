@@ -416,6 +416,21 @@ a:hover { color: var(--fi-accent-strong); text-decoration: underline; }
     color: var(--fi-text-muted);
 }
 
+.fi-impact-legend {
+    color: var(--fi-text-faint);
+    font-size: 0.82rem;
+    margin: -4px 0 14px;
+}
+
+.fi-dev-detail summary {
+    cursor: pointer;
+    color: var(--fi-text-faint);
+    font-size: 0.82rem;
+    font-weight: 500;
+    user-select: none;
+}
+.fi-dev-detail .fi-fingerprint { margin-top: 10px; }
+
 /* ---------- Responsive ---------- */
 
 @media (max-width: 760px) {

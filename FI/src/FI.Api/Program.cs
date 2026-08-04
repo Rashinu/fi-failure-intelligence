@@ -1,5 +1,7 @@
+using FI.Api.ErrorHandling;
 using FI.Api.Extensions;
 using FI.Api.Middleware;
+using FI.Api.Security;
 using FI.Domain.AiAnalysis;
 using FI.Infrastructure.Ai;
 using FI.Infrastructure.Persistence;
@@ -30,6 +32,12 @@ builder.Host.UseSerilog((context, services, loggerConfig) => loggerConfig
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Bkz. docs/reviews/M20_1_PRODUCTION_SAFETY_REPORT.md P0-B - tek, tutarlı bir RFC 7807
+// ProblemDetails çıktısı; controller-özel try/catch birincil strateji DEĞİL, bilinçli olarak
+// dar kalan istisnalar (bkz. IncidentsController.Resolve) hâlâ kendi yerel eşlemesini korur.
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 // Bkz. docs/CTO_REVIEW_ANALYSIS.md M17 (Product Proof) - mevcut Product API'nin uzerine ince
 // bir Razor Pages sunum katmani (Incident Dashboard/Detail); ayri bir frontend projesi/deploy
@@ -90,6 +98,18 @@ if (args.Contains("--migrate"))
     return;
 }
 
+// Bkz. docs/reviews/M20_1_PRODUCTION_SAFETY_REPORT.md P0-A - Development/Docker Compose'un
+// bilinçli olarak kullandığı zayıf placeholder secret'ların (Admin:SharedSecret, ApiKeys:Pepper)
+// Production'da sessizce kabul edilmesini engeller. Yalnızca serve-mode'u etkiler - migrate
+// modu yukarıda zaten "return" ile çıktığından bu kontrolün hiçbir zaman migration'ı engellemez.
+var insecureProductionSecretKeys = ProductionSecretValidator.Validate(app.Configuration, app.Environment.IsProduction());
+if (insecureProductionSecretKeys.Count > 0)
+{
+    throw new InvalidOperationException(
+        $"Production ortamı, güvensiz/placeholder değerlerle başlatılamaz. " +
+        $"Eksik veya yanlış yapılandırılmış anahtarlar: {string.Join(", ", insecureProductionSecretKeys)}.");
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -98,10 +118,16 @@ if (app.Environment.IsDevelopment())
 
 app.UseSerilogRequestLogging();
 
+app.UseMiddleware<CorrelationIdMiddleware>();
+
+// Bkz. docs/reviews/M20_1_PRODUCTION_SAFETY_REPORT.md P0-B - CorrelationIdMiddleware'den SONRA
+// (traceId zaten HttpContext.Items'ta olsun diye), ama rate limiting/auth/routing/endpoint
+// execution'dan ÖNCE (hepsini sarabilsin diye) kayıtlı.
+app.UseExceptionHandler();
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
-app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseRateLimiter();
 app.UseMiddleware<ApiKeyAuthMiddleware>();
 app.UseMiddleware<AdminBasicAuthMiddleware>();

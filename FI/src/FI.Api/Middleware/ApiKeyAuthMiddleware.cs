@@ -16,6 +16,13 @@ public class ApiKeyAuthMiddleware
     public const string HeaderName = "X-Api-Key";
     public const string ItemsKey = "IntegrationId";
 
+    /// <summary>Bkz. docs/reviews/M20_1_PRODUCTION_SAFETY_REPORT.md P0-A - yalnızca
+    /// "ApiKeys:Pepper" hiç yapılandırılmamışsa kullanılır; herhangi bir paylaşılan/production
+    /// ortamında gerçek bir değerle override edilmelidir. ProductionSecretValidator bu sabitin
+    /// Production'da hâlâ etkin olup olmadığını kontrol eder. Testlerin bu sabiti
+    /// kullanabilmesi için public.</summary>
+    public const string LocalDevPepperDefault = "local-dev-pepper-change-me";
+
     private static readonly PathString[] ProtectedPathPrefixes =
     {
         "/api/v1/events",
@@ -47,7 +54,8 @@ public class ApiKeyAuthMiddleware
         }
 
         var rawKey = apiKeyValues.ToString();
-        var pepper = _configuration["ApiKeys:Pepper"] ?? "local-dev-pepper-change-me";
+        var pepper = _configuration["ApiKeys:Pepper"];
+        pepper = string.IsNullOrWhiteSpace(pepper) ? LocalDevPepperDefault : pepper;
         var keyHash = ComputeHash(rawKey, pepper);
 
         var apiKey = await db.ApiKeys

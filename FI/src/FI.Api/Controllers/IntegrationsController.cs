@@ -41,7 +41,8 @@ public class IntegrationsController : ControllerBase
             request.EndpointUrl,
             criticality);
 
-        var pepper = _configuration["ApiKeys:Pepper"] ?? "local-dev-pepper-change-me";
+        var pepperConfigValue = _configuration["ApiKeys:Pepper"];
+        var pepper = string.IsNullOrWhiteSpace(pepperConfigValue) ? ApiKeyAuthMiddleware.LocalDevPepperDefault : pepperConfigValue;
         var (rawKey, keyPrefix, keyHash) = GenerateApiKey(pepper);
         integration.IssueApiKey(keyPrefix, keyHash);
 
@@ -109,7 +110,8 @@ public class IntegrationsController : ControllerBase
         var integration = await _db.Integrations.Include(i => i.ApiKeys).FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
         if (integration is null) return NotFound();
 
-        var pepper = _configuration["ApiKeys:Pepper"] ?? "local-dev-pepper-change-me";
+        var pepperConfigValue = _configuration["ApiKeys:Pepper"];
+        var pepper = string.IsNullOrWhiteSpace(pepperConfigValue) ? ApiKeyAuthMiddleware.LocalDevPepperDefault : pepperConfigValue;
         var (rawKey, keyPrefix, keyHash) = GenerateApiKey(pepper);
         var newApiKey = integration.RotateApiKey(keyPrefix, keyHash, DateTimeOffset.UtcNow);
 

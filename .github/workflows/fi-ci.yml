@@ -90,6 +90,10 @@ jobs:
             "Outbox.OutboxControllerTests"
             "Jobs.FiTelemetryTests"
             "Incidents.IncidentResolutionTests"
+            "Security.ProductionSecretValidatorTests"
+            "Security.ProductionStartupTests"
+            "ErrorHandling.GlobalExceptionHandlingTests"
+            "ErrorHandling.GlobalExceptionHandlerUnitTests"
           )
           for cls in "${classes[@]}"; do
             echo "::group::$cls"

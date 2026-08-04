@@ -4,3 +4,5 @@ FI/**/obj/
 FI/**/.vs/
 FI/coverage/
 *.user
+.env
+.env.*

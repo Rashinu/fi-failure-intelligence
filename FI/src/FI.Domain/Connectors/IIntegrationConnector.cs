@@ -20,8 +20,9 @@ public interface IIntegrationConnector
     NormalizedEvent Normalize(RawInboundPayload payload, bool isSignatureVerified);
 
     /// <summary>
-    /// Doğrulama başarısızsa event reddedilmez — SIGNATURE_ERROR kategorisiyle yine de kaydedilir
-    /// (Bölüm 34, madde 6). Sabit-zamanlı karşılaştırma kullanılmalıdır (timing attack önlemi).
+    /// Bkz. docs/reviews/M20_2_DEMO_AND_SECURITY.md P0-1 - WebhooksController.IngestEvent artık
+    /// bu false dönerse isteği 401 ile reddediyor (hiçbir IntegrationEvent/incident oluşturmadan).
+    /// Sabit-zamanlı karşılaştırma kullanılmalıdır (timing attack önlemi).
     /// </summary>
     bool VerifySignature(RawInboundPayload payload, string secret);
 

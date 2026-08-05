@@ -94,6 +94,7 @@ jobs:
             "Security.ProductionStartupTests"
             "ErrorHandling.GlobalExceptionHandlingTests"
             "ErrorHandling.GlobalExceptionHandlerUnitTests"
+            "Demo.GoldenIncidentDemoPageTests"
           )
           for cls in "${classes[@]}"; do
             echo "::group::$cls"

@@ -16,8 +16,11 @@ namespace FI.Api.Controllers;
 /// farklı olarak burada kimlik doğrulama X-Api-Key değil, connector'a özgü webhook imzasıdır
 /// (Stripe-Signature, X-Hub-Signature-256, vb.) — bu yüzden <see cref="ApiKeyAuthMiddleware"/>
 /// kapsamı dışındadır (route prefix'i middleware'in korumalı liste'sinde yok).
-/// İmza doğrulaması başarısız olsa bile event reddedilmez; SIGNATURE_ERROR olarak kaydedilir
-/// (Bölüm 34, madde 6) — bu bilginin kendisi bir incident sinyalidir.
+/// Bkz. docs/reviews/M20_2_DEMO_AND_SECURITY.md P0-1 — daha önce (M20.1'den önce) imza
+/// doğrulaması başarısız olsa bile event kabul edilip SIGNATURE_ERROR olarak kaydediliyordu; bu,
+/// canlı bir pentest'te dashboard-spam riski olarak tespit edildi (kimliksiz istek gerçek bir
+/// business incident'a dönüşebiliyordu). Artık her iki alt-route da (events, deployments) imza
+/// doğrulanamazsa 401 ile REDDEDİLİYOR - hiçbir IntegrationEvent/incident hiç oluşturulmuyor.
 /// </summary>
 [ApiController]
 [Route("api/v1/webhooks/{provider}/{integrationId:guid}")]
@@ -49,8 +52,18 @@ public class WebhooksController : ControllerBase
 
         var payload = await ReadRawPayloadAsync(cancellationToken);
 
+        // Bkz. docs/reviews/M20_2_DEMO_AND_SECURITY.md P0-1 - kabul kararı (401/403/400
+        // arasında): 401 seçildi çünkü bu aynı kimlik doğrulama semantiği - "bu isteğin kim
+        // tarafından gönderildiğini kanıtlayamadın" - bu codebase'in geri kalanıyla zaten tutarlı
+        // (ApiKeyAuthMiddleware, AdminBasicAuthMiddleware ve bu controller'ın kendi
+        // IngestDeployment action'ı hep 401 kullanıyor). Eksik/geçersiz/süresi dolmuş imza artık
+        // aynı yolu izliyor: hiçbir IntegrationEvent/incident oluşturulmadan, işlenmeden reddedilir
+        // - dashboard'a asla ulaşmıyor. Idempotency/dedup kontrolü bundan SONRA (yalnızca gerçekten
+        // doğrulanmış istekler için) çalışır, bu yüzden meşru sağlayıcı retry'ları etkilenmez.
         var webhookSecret = UnprotectWebhookSecret(integration.WebhookSecret);
         var isSignatureVerified = webhookSecret is not null && connector.VerifySignature(payload, webhookSecret);
+        if (!isSignatureVerified)
+            return Unauthorized(new { error = "Webhook imzası doğrulanamadı." });
 
         var normalized = connector.Normalize(payload, isSignatureVerified);
 

@@ -1,0 +1,106 @@
+@page
+@model FI.Api.Pages.Demo.GoldenIncidentModel
+@{
+    ViewData["Title"] = "Golden Incident Demo";
+}
+
+<div class="fi-demo-banner">
+    <strong>Static demo snapshot</strong> — this is a frozen, read-only copy of a real FI run
+    (no login required, no live data, no actions possible here).
+    <a href="mailto:muratberatkeskin@gmail.com?subject=FI%20Demo%20Access">Ask for live access →</a>
+</div>
+
+<div class="fi-detail-header">
+    <div>
+        <h1 class="fi-page-title">PaymentService (Prod) — AuthenticationError</h1>
+        <div class="fi-detail-meta">
+            First seen 2026-08-04 20:37 · Last seen 2026-08-04 20:37 · 43 events
+        </div>
+    </div>
+    <div>
+        <span class="fi-badge fi-badge-critical">Critical</span>
+        <span class="fi-badge fi-badge-review">NeedsHumanReview</span>
+    </div>
+</div>
+
+<div class="fi-section">
+    <h2>Business Impact</h2>
+    <p class="fi-impact-legend">
+        Event = a raw technical failure · Operation = a real business action those events
+        represent · Customer = a real person or account affected by it.
+    </p>
+    <div class="fi-ai-row fi-card">
+        <div><strong>Technical events</strong>43</div>
+        <div><strong>Known operations</strong>12</div>
+        <div><strong>Affected customers</strong>7</div>
+        <div><strong>Duration</strong>&lt; 1 min</div>
+    </div>
+</div>
+
+<div class="fi-section">
+    <h2>What should I do now?</h2>
+    <div class="fi-suggested-action">
+        <strong>Suggested first step:</strong> API key'in geçerliliğini ve son rotasyon zamanını kontrol edin.
+    </div>
+</div>
+
+<div class="fi-section">
+    <h2>AI-Assisted Analysis</h2>
+    <div class="fi-empty">
+        No AI analysis in this run — evidence was collected, but no Anthropic API key was
+        configured, so the system correctly skipped AI analysis rather than guess, and fell back
+        to <strong>NeedsHumanReview</strong>. This is the real, observed behavior of this exact
+        run, not a placeholder: FI never invents a root cause it cannot support with evidence.
+    </div>
+</div>
+
+<div class="fi-section">
+    <h2>Evidence (3)</h2>
+    <div class="fi-evidence-list">
+        <div class="fi-evidence-card">
+            <div class="fi-evidence-source">ConfigChange</div>
+            <div class="fi-evidence-summary">API key rotated for integration 'PaymentService (Prod)' 0 minute(s) before first failure</div>
+            <div class="fi-evidence-time">2026-08-04 20:38</div>
+        </div>
+        <div class="fi-evidence-card">
+            <div class="fi-evidence-source">PreviousEvent</div>
+            <div class="fi-evidence-summary">Previous event: status 401, category AuthenticationError, 0 minute(s) before first failure</div>
+            <div class="fi-evidence-time">2026-08-04 20:38</div>
+        </div>
+        <div class="fi-evidence-card">
+            <div class="fi-evidence-source">PreviousEvent</div>
+            <div class="fi-evidence-summary">Previous event: status 401, category AuthenticationError, 0 minute(s) before first failure</div>
+            <div class="fi-evidence-time">2026-08-04 20:38</div>
+        </div>
+    </div>
+</div>
+
+<div class="fi-section">
+    <h2>Timeline</h2>
+    <div class="fi-timeline">
+        <div class="fi-timeline-item">
+            <div>First error observed</div>
+            <div class="fi-timeline-time">2026-08-04 20:37</div>
+        </div>
+        <div class="fi-timeline-item">
+            <div>Evidence collected: ConfigChange</div>
+            <div class="fi-timeline-time">2026-08-04 20:38</div>
+        </div>
+        <div class="fi-timeline-item">
+            <div>Evidence collected: PreviousEvent (×2)</div>
+            <div class="fi-timeline-time">2026-08-04 20:38</div>
+        </div>
+    </div>
+</div>
+
+<div class="fi-section">
+    <details class="fi-dev-detail">
+        <summary>Developer / technical detail</summary>
+        <div class="fi-card fi-fingerprint">BBA5D624266EB5D8715113171463603AF5B13E50B2B101AD66A078A65CF2FD81</div>
+    </details>
+</div>
+
+<div class="fi-demo-footer">
+    Want to see this resolve and auto-reopen live, or run it against your own integration?
+    <a href="mailto:muratberatkeskin@gmail.com?subject=FI%20Demo%20Access">Get in touch →</a>
+</div>

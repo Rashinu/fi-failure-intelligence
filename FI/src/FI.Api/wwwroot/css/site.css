@@ -251,6 +251,26 @@ a:hover { color: var(--fi-accent-strong); text-decoration: underline; }
 }
 .fi-reopen-banner strong { color: var(--fi-medium); }
 
+.fi-demo-banner {
+    background: rgba(109,139,255,0.08);
+    border: 1px solid rgba(109,139,255,0.3);
+    border-radius: var(--fi-radius);
+    padding: 13px 18px;
+    font-size: 0.88rem;
+    margin-bottom: 24px;
+    color: var(--fi-text);
+}
+.fi-demo-banner a, .fi-demo-footer a { color: var(--fi-accent-strong); margin-left: 8px; }
+
+.fi-demo-footer {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid var(--fi-border);
+    font-size: 0.9rem;
+    color: var(--fi-text-muted);
+    text-align: center;
+}
+
 /* ---------- Detail page ---------- */
 
 .fi-back {

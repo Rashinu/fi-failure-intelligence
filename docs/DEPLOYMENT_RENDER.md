@@ -2,15 +2,23 @@
 
 ## Servisler
 
-- **Postgres**: `fi-postgres` (id `dpg-d9nlm0jm8hqs73ekkcgg-a`), plan `free`, region `oregon`.
-  - **Free plan 30 gün sonra siliniyor** — bu instance `2026-08-02` tarihinde oluşturuldu,
-    `expiresAt: 2026-09-01`. Render'ın gerçek API cevabı bunu doğruladı (yaygın bilinen "90 gün"
-    varsayımı bu hesap için YANLIŞ çıktı — gerçek süre 30 gün). **2026-09-01'den önce Starter
-    plana yükseltilmezse veritabanı ve içindeki tüm incident geçmişi silinir.**
+- **Postgres**: `fi-postgres` (id `dpg-d9nlm0jm8hqs73ekkcgg-a`), plan **`basic_256mb`** ($6/ay +
+  $0.30/GB depolama), region `oregon`.
+  - **2026-08-06'da free plandan `basic_256mb`'a yükseltildi** (30 günlük otomatik silinme riski
+    kapatıldı — `basic_256mb`'ın API cevabında artık hiç `expiresAt` alanı yok). Yükseltme
+    **yerinde** oldu: aynı instance ID, aynı connection string, sıfır kod/config değişikliği,
+    sıfır downtime (health check'ler kesintisiz 200 döndü).
+  - Yükseltmeden HEMEN ÖNCE tam bir `pg_dump` yedeği alındı (`backups/fi_render_backup_2026-08-06.dump`,
+    27 tablo, doğrulandı — yalnızca bu makinede, asla commit edilmedi) — yükseltme başarısız olsaydı
+    diye önlem, fiilen kullanılmadı çünkü yükseltme sorunsuz geçti.
   - Database adı Render tarafından `fi` yerine `fi_120k` olarak oluşturuldu (otomatik suffix).
-- **Web Service**: `fi-api` (id `srv-d9nm21ijnfac73bc8pkg`), plan `free`, region `oregon`.
+- **Web Service**: `fi-api` (id `srv-d9nm21ijnfac73bc8pkg`), plan **hâlâ `free`**, region `oregon`.
   - URL: `https://fi-api-0bif.onrender.com`
   - Dockerfile: `FI/docker/Dockerfile`, context `FI/`.
+  - ⚠️ **Önemli ayrım:** Postgres'in silinme riski kapandı, ama web service hâlâ Free planda —
+    bu yüzden aşağıdaki "manuel migration runbook" (preDeployCommand'ın paid-only olması nedeniyle)
+    **hâlâ geçerli**. Bu ikisi ayrı sorunlar: biri veri kaybı riskiydi (çözüldü), diğeri
+    operasyonel bir zahmet (web service Starter'a geçmeden çözülmeyecek).
 
 ## Env Var Notları
 
@@ -81,17 +89,18 @@ tekrarlanabilir şekilde uygulanmalıdır:
 
 ---
 
-## Known Limitations (Free Tier)
+## Known Limitations (Web Service hâlâ Free Tier)
 
-- `preDeployCommand` yok → yukarıdaki manuel süreç zorunlu.
-- Otomatik backup/point-in-time-restore yok.
-- Postgres **2026-09-01**'de otomatik siliniyor (30 gün) — Starter'a yükseltilmezse tüm veri kaybolur.
+- `preDeployCommand` yok → yukarıdaki manuel süreç hâlâ zorunlu (bu, Postgres'in plan'ından
+  değil, **web service**'in Free planda olmasından kaynaklanıyor).
 - Web service "sleep after inactivity" (15 dakika) — ilk istekte soğuk başlama gecikmesi.
+- ~~Postgres 2026-09-01'de otomatik siliniyor~~ — **ÇÖZÜLDÜ** (2026-08-06, `basic_256mb`'a
+  yükseltildi, bkz. yukarıdaki "Servisler" bölümü). Artık PITR/backup da mevcut (paid tier).
 
 ## Recommendation
 
-Mevcut süreç yalnızca **Design-Partner Demo (sentetik veri)** aşaması için kabul edilebilir.
-**Private Pilot**'a geçilmeden önce: web service Starter (veya üstü) plana yükseltilmeli
-(`preDeployCommand` devreye alınmalı) VE Postgres Starter'a yükseltilmeli (30 günlük silinme
-riskini ve backup eksikliğini ortadan kaldırmak için). Bu iki yükseltme olmadan gerçek müşteri
-verisiyle onboarding **yapılmamalıdır**.
+Postgres tarafı artık **Private Pilot** için yeterli (silinme riski kapandı, backup var).
+Kalan tek engel: **web service** hâlâ Free planda, bu yüzden `preDeployCommand` kullanılamıyor ve
+yukarıdaki manuel IP-allowlist runbook'u her migration'da hâlâ gerekiyor. Web service Starter
+(veya üstü) plana yükseltilmeden gerçek müşteri verisiyle onboarding **yapılmamalıdır** —
+yalnızca bu tek adım kaldı.

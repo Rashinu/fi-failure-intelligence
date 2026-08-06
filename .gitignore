@@ -6,3 +6,4 @@ FI/coverage/
 *.user
 .env
 .env.*
+backups/

@@ -242,6 +242,36 @@ public class AiAnalysisValidatorTests
     }
 
     [Fact]
+    public void RootCauseWithCommonEnglishStopwords_NotFalselyFlaggedAsUnsupportedEntities()
+    {
+        // Bkz. docs/reviews/PROMPT_QUALITY_ITERATION.md - gerçek bir Claude Haiku koşusunda somut
+        // olarak gözlemlendi: EntityLikeTokenRegex, cümle başına gelen sıradan İngilizce
+        // kelimeleri ("Human", "However", "Repeated") gerçek bir entity/sistem adıymış gibi
+        // yakalıyordu. CommonEnglishWordStopList bunu düzeltir - bu kelimeler artık asla flag'lenmez.
+        var response = EntityResponseJson(
+            "API_KEY was rotated. However, the evidence is limited. Human review is recommended " +
+            "because of the repeated pattern observed here.");
+
+        var (result, _) = AiAnalysisValidator.Validate(response, EntityExpected, EntityEvidence);
+
+        result.OutOfEvidenceClaimsDetected.Should().BeFalse();
+        result.FlaggedClaims.Should().NotContain("However").And.NotContain("Human");
+    }
+
+    [Fact]
+    public void RootCauseWithGenuineNewEntity_StillFlagged_StopListDoesNotLoosenRealDetection()
+    {
+        // Stopword filtresi yalnızca listedeki TAM kelimeleri hariç tutar - gerçek, evidence
+        // dışı bir entity adı (listede olmayan) hâlâ doğru şekilde yakalanmalı.
+        var response = EntityResponseJson("The CustomBillingProxy service intercepted and dropped the request");
+
+        var (result, _) = AiAnalysisValidator.Validate(response, EntityExpected, EntityEvidence);
+
+        result.OutOfEvidenceClaimsDetected.Should().BeTrue();
+        result.FlaggedClaims.Should().Contain("CustomBillingProxy");
+    }
+
+    [Fact]
     public void RootCauseWithUngroundedNumber_StillFlagged_NormalizationDoesNotLoosenNumericCheck()
     {
         // Bkz. M19 P0-C: normalizasyon yalnızca noktalama/boşluk farklarını gideriyor - sayısal

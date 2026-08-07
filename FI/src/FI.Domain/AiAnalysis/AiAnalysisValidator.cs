@@ -30,6 +30,33 @@ public static class AiAnalysisValidator
     private static readonly Regex MarkdownFenceRegex = new(@"^```(?:json)?\s*|\s*```$", RegexOptions.Compiled | RegexOptions.Multiline);
     private static readonly Regex NonAlphanumericRegex = new(@"[^a-zA-Z0-9]", RegexOptions.Compiled);
 
+    /// <summary>
+    /// Bkz. docs/reviews/PROMPT_QUALITY_ITERATION.md - "ADIM 2" gerçek Claude Haiku koşusunda
+    /// (V2 prompt taslağı) somut olarak gözlemlenen false-positive kaynağı: EntityLikeTokenRegex
+    /// yalnızca "büyük harfle başlayan 4+ karakter" arıyor, bu da cümle başına gelen veya
+    /// açıklayıcı düzyazıda geçen sıradan İngilizce kelimeleri ("Human", "However", "Repeated")
+    /// gerçek bir entity/sistem adıymış gibi yakalıyordu (FlaggedClaims=["Human"] gibi, gerçek
+    /// bir uydurma değil). Bu liste SAYISAL kontrolü (NumberTokenRegex) HİÇ etkilemez - yalnızca
+    /// EntityLikeTokenRegex eşleşmelerine, corpus karşılaştırmasından ÖNCE uygulanır. Kasıtlı
+    /// olarak dar tutuldu (genel bir İngilizce stopword sözlüğü değil) - yalnızca gerçek
+    /// çalıştırmalarda görülen veya açıklayıcı/geçiş kelimesi kategorisine giren, entity/sistem
+    /// adı OLMASI mantıken imkansız kelimeler içeriyor. Gerçek bir entity/sistem adı (ör. yeni
+    /// bir kod veya ürün adı) bu listede YOKTUR ve hâlâ doğru şekilde yakalanır.
+    /// </summary>
+    private static readonly HashSet<string> CommonEnglishWordStopList = new(StringComparer.Ordinal)
+    {
+        "Human", "However", "Repeated", "Additionally", "Furthermore", "Therefore", "Because",
+        "Since", "While", "Given", "This", "That", "These", "Those", "The", "Review", "Verify",
+        "Check", "Confirm", "Note", "Also", "Please", "Consider", "Ensure", "Investigate",
+        "Examine", "Audit", "Monitor", "Evidence", "Root", "Cause", "Based", "According",
+        "Current", "Recent", "Multiple", "Several", "Various", "Both", "Either", "Neither",
+        "Rather", "Instead", "Overall", "Specifically", "Notably", "Importantly",
+        "Alternatively", "Similarly", "Meanwhile", "Subsequently", "Consequently", "Ultimately",
+        "Effectively", "Actually", "Generally", "Typically", "Usually", "Potentially",
+        "Possibly", "Likely", "Unlikely", "Confirmed", "Unconfirmed", "Suggests", "Suggesting",
+        "Indicates", "Indicating", "Requires", "Recommend", "Recommended", "Suggested"
+    };
+
     public static (AiAnalysisValidationResult Result, AiAnalysisOutput? Output) Validate(
         string? rawResponseText,
         DeterministicClassificationInput expected,
@@ -107,10 +134,13 @@ public static class AiAnalysisValidator
 
         var candidateText = output.ProbableRootCause ?? string.Empty;
 
-        var tokens = NumberTokenRegex.Matches(candidateText).Select(m => m.Value)
-            .Concat(EntityLikeTokenRegex.Matches(candidateText).Select(m => m.Value))
-            .Distinct()
-            .ToList();
+        // Bkz. CommonEnglishWordStopList doc'u - stopword filtresi yalnızca entity-benzeri
+        // token akışına uygulanır, sayısal token'lara (NumberTokenRegex) HİÇ dokunmaz.
+        var numberTokens = NumberTokenRegex.Matches(candidateText).Select(m => m.Value);
+        var entityTokens = EntityLikeTokenRegex.Matches(candidateText).Select(m => m.Value)
+            .Where(t => !CommonEnglishWordStopList.Contains(t));
+
+        var tokens = numberTokens.Concat(entityTokens).Distinct().ToList();
 
         var flagged = tokens
             .Where(t => !normalizedCorpus.Contains(Normalize(t), StringComparison.OrdinalIgnoreCase))

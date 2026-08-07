@@ -1,7 +1,9 @@
 # FI — AI Integration Failure Intelligence
 
-Bir SaaS entegrasyonu bozulduğunda neyin bozulduğunu, neden bozulmuş olabileceğini ve hangi
-kullanıcıların/işlemlerin etkilendiğini evidence-backed AI analiziyle gösteren sistem.
+Hookdeck/Svix size neyin patladığını gösterir, FI neden patladığını ve ne yapmanız gerektiğini
+söyler — bir SaaS entegrasyonu (Stripe, GitHub, SES) bozulduğunda, hangi kullanıcıların/
+işlemlerin etkilendiğini ve olası kök nedeni evidence-backed AI analiziyle ortaya çıkaran,
+teslimat katmanının üstüne eklenen bir sistem (bkz. [`docs/positioning.md`](../docs/positioning.md)).
 
 Mimari kaynak: [`docs/FAILURE_INTELLIGENCE_ARCHITECTURE.md`](../docs/FAILURE_INTELLIGENCE_ARCHITECTURE.md)
 Karar dokümanı: [`docs/ARCHITECTURE_REVIEW.md`](../docs/ARCHITECTURE_REVIEW.md)

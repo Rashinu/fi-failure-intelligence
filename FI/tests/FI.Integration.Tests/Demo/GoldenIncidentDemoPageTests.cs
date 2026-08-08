@@ -67,6 +67,20 @@ public class GoldenIncidentDemoPageTests : IClassFixture<FiApiFactory>
     }
 
     [Fact]
+    public async Task DemoPage_ShowsAllThreeScenarioTabs()
+    {
+        var client = _factory.CreateUnauthenticatedClient();
+
+        var html = await client.GetStringAsync("/Demo/GoldenIncident");
+
+        html.Should().Contain("Payment failure (Stripe)");
+        html.Should().Contain("Webhook signature error (Stripe)");
+        html.Should().Contain("Email delivery rate limit (SES)");
+        html.Should().Contain("SignatureError");
+        html.Should().Contain("RateLimitError");
+    }
+
+    [Fact]
     public async Task DemoPage_HasNoLinksToAuthProtectedRoutes()
     {
         // Bkz. canlı tespit edilen gerçek bulgu: sayfa ortak _Layout.cshtml'i (header/nav/footer)

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@(ViewData["Title"] is string t ? $"{t} — FI" : "FI — Failure Intelligence")</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/site.css" />
+</head>
+<body>
+    <!-- Bkz. docs/reviews/M20_2_DEMO_AND_SECURITY.md P0-2 - bu, herkese açık/kimliksiz demo
+         sayfaları için ayrı bir layout. _Layout.cshtml'in header/nav/footer'ı (/Incidents,
+         /swagger, /hangfire) hep korumalı rotalara gider - bir demo ziyaretçisinin bunlardan
+         birine tıklayıp 401 duvarına çarpması yaşandı (canlı tespit edildi). Bu layout hiçbir
+         tıklanabilir, korumalı bir rotaya giden link İÇERMEZ - marka işareti bilerek link değil,
+         yalnızca statik bir etiket. -->
+    <header class="fi-header">
+        <span class="fi-brand"><span class="fi-logo-mark">FI</span> Failure Intelligence</span>
+    </header>
+    <main class="fi-main">
+        @RenderBody()
+    </main>
+    <footer class="fi-footer">
+        <span>FI — evidence-backed failure intelligence</span>
+    </footer>
+</body>
+</html>
